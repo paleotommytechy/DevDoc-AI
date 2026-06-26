@@ -1,0 +1,6 @@
+{
+  "name": "DevDoc AI",
+  "description": "AI-powered SaaS application that allows developers to upload a backend project and automatically generate high-quality API documentation using AI.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

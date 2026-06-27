@@ -2,6 +2,7 @@ import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider, useAuth } from "./context/AuthContext";
+import { ToastProvider } from "./context/ToastContext";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -63,61 +64,63 @@ function GuestRoute({ children }: { children: React.ReactNode }) {
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <BrowserRouter>
-          <Routes>
-            {/* Public landing page */}
-            <Route path="/" element={<Home />} />
+      <ToastProvider>
+        <AuthProvider>
+          <BrowserRouter>
+            <Routes>
+              {/* Public landing page */}
+              <Route path="/" element={<Home />} />
 
-            {/* Guest routes (Redirects to dashboard if already logged in) */}
-            <Route
-              path="/login"
-              element={
-                <GuestRoute>
-                  <Login />
-                </GuestRoute>
-              }
-            />
-            <Route
-              path="/register"
-              element={
-                <GuestRoute>
-                  <Register />
-                </GuestRoute>
-              }
-            />
+              {/* Guest routes (Redirects to dashboard if already logged in) */}
+              <Route
+                path="/login"
+                element={
+                  <GuestRoute>
+                    <Login />
+                  </GuestRoute>
+                }
+              />
+              <Route
+                path="/register"
+                element={
+                  <GuestRoute>
+                    <Register />
+                  </GuestRoute>
+                }
+              />
 
-            {/* Protected routes (Redirects to login if not logged in) */}
-            <Route
-              path="/dashboard"
-              element={
-                <ProtectedRoute>
-                  <Dashboard />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/projects/:id"
-              element={
-                <ProtectedRoute>
-                  <ProjectDetails />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/projects/:id/analysis"
-              element={
-                <ProtectedRoute>
-                  <ProjectAnalysis />
-                </ProtectedRoute>
-              }
-            />
+              {/* Protected routes (Redirects to login if not logged in) */}
+              <Route
+                path="/dashboard"
+                element={
+                  <ProtectedRoute>
+                    <Dashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/projects/:id"
+                element={
+                  <ProtectedRoute>
+                    <ProjectDetails />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/projects/:id/analysis"
+                element={
+                  <ProtectedRoute>
+                    <ProjectAnalysis />
+                  </ProtectedRoute>
+                }
+              />
 
-            {/* Fallback routing */}
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </BrowserRouter>
-      </AuthProvider>
+              {/* Fallback routing */}
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </BrowserRouter>
+        </AuthProvider>
+      </ToastProvider>
     </QueryClientProvider>
   );
 }

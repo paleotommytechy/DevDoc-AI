@@ -51,9 +51,18 @@ class DbService {
             ? { rejectUnauthorized: false }
             : false,
         });
-        this.isFallback = false;
-        logger.info("🔌 Connected to PostgreSQL/Supabase database successfully.");
-        this.initializeDatabaseSchema();
+        
+        // Verify connection immediately
+        this.pool.query("SELECT NOW();")
+          .then(() => {
+            this.isFallback = false;
+            logger.info("🔌 Connected to PostgreSQL/Supabase database successfully.");
+            this.initializeDatabaseSchema();
+          })
+          .catch((err) => {
+            this.isFallback = true;
+            this.logDetailedDatabaseError(err, dbUrl);
+          });
       } catch (err) {
         logger.error("❌ Failed to initialize PostgreSQL pool. Falling back to in-memory database.", err);
         this.isFallback = true;
@@ -62,6 +71,39 @@ class DbService {
       logger.warn("⚠️ No DATABASE_URL found in environment. Running with in-memory database fallback.");
       this.isFallback = true;
     }
+  }
+
+  private logDetailedDatabaseError(err: any, dbUrl: string) {
+    const maskedUrl = dbUrl.replace(/:([^:@]+)@/, ":******@");
+    console.error("\n================================================================================");
+    console.error("❌ DATABASE CONNECTION DIAGNOSTIC FAILURE:");
+    console.error(`Database URL:  ${maskedUrl}`);
+    console.error(`Raw Error:     ${err.message || err}`);
+    console.error("--------------------------------------------------------------------------------");
+    
+    const errMsg = String(err.message || "").toLowerCase();
+    
+    if (errMsg.includes("self-signed certificate")) {
+      console.error("👉 [DIAGNOSIS: SSL CERTIFICATE ISSUE]");
+      console.error("The database server requires an SSL-secured connection (common with Supabase/ElephantSQL).");
+      console.error("Solution: Make sure your DATABASE_URL has '?sslmode=require' appended to it.");
+    } else if (errMsg.includes("password authentication failed")) {
+      console.error("👉 [DIAGNOSIS: PASSWORD/AUTHENTICATION ERROR]");
+      console.error("The password supplied in your database connection string is incorrect.");
+      console.error("Solution: Verify your password. Note that special characters in passwords must be URL-encoded.");
+    } else if (errMsg.includes("enotfound") || errMsg.includes("getaddrinfo")) {
+      console.error("👉 [DIAGNOSIS: DNS / SERVER UNREACHABLE]");
+      console.error("The server host name could not be resolved.");
+      console.error("Solution: Verify your network connection and double-check the spelling of your database host.");
+    } else if (errMsg.includes("econnrefused") || err.code === "ECONNREFUSED" || errMsg.includes("timeout")) {
+      console.error("👉 [DIAGNOSIS: PORT / FIREWALL / OFFLINE]");
+      console.error("The connection attempt was refused or timed out.");
+      console.error("Solution: Check if the database port is open and the server is running. If using Supabase, make sure your project isn't paused.");
+    } else {
+      console.error("👉 [DIAGNOSIS: GENERAL CONNECTION FAILURE]");
+      console.error("Please inspect database URL credentials and local network outbound port permissions.");
+    }
+    console.error("================================================================================\n");
   }
 
   private async initializeDatabaseSchema() {

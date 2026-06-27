@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { projectsApi } from "../services/api";
@@ -29,6 +29,71 @@ export default function ProjectDetails() {
   const [editName, setEditName] = useState("");
   const [editDesc, setEditDesc] = useState("");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+
+  // File upload mutation
+  const uploadMutation = useMutation({
+    mutationFn: async (file: File) => {
+      if (!id) return;
+      const res = await projectsApi.uploadCodebase(id, file);
+      if (!res.success) {
+        throw new Error(res.message || "Codebase analysis failed.");
+      }
+      return res.data?.project;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["project", id] });
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      setSelectedFile(null);
+      navigate(`/projects/${id}/analysis`);
+    },
+    onError: (err: any) => {
+      setErrorMsg(err.message || "Failed to upload or analyze codebase.");
+    }
+  });
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(true);
+  };
+
+  const handleDragLeave = () => {
+    setDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const file = e.dataTransfer.files[0];
+      if (file.name.endsWith(".zip")) {
+        setSelectedFile(file);
+        setErrorMsg(null);
+      } else {
+        setErrorMsg("Only .zip archives are supported for scanning.");
+      }
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const file = e.target.files[0];
+      if (file.name.endsWith(".zip")) {
+        setSelectedFile(file);
+        setErrorMsg(null);
+      } else {
+        setErrorMsg("Only .zip archives are supported for scanning.");
+      }
+    }
+  };
+
+  const handleUploadSubmit = () => {
+    if (!selectedFile) return;
+    uploadMutation.mutate(selectedFile);
+  };
 
   // 1. Fetch single project
   const { data: project, isLoading, isError } = useQuery({
@@ -114,6 +179,27 @@ export default function ProjectDetails() {
       <div className="min-h-screen bg-slate-50 flex flex-col justify-center items-center gap-4">
         <Loader2 className="h-8 w-8 text-indigo-600 animate-spin" />
         <p className="text-sm text-slate-500 font-medium">Loading project details...</p>
+      </div>
+    );
+  }
+
+  if (uploadMutation.isPending) {
+    return (
+      <div className="min-h-screen bg-slate-900 text-white flex flex-col justify-center items-center p-6 text-center">
+        <div className="relative flex items-center justify-center mb-8">
+          <span className="absolute inline-flex h-20 w-20 rounded-full bg-indigo-500 opacity-20 animate-ping"></span>
+          <div className="h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex shadow-lg shadow-indigo-500/30">
+            <Terminal className="h-8 w-8 text-white animate-pulse" />
+          </div>
+        </div>
+        <h3 className="text-2xl font-bold tracking-tight">Analyzing Project...</h3>
+        <p className="mt-2 text-sm text-slate-400 max-w-sm leading-relaxed">
+          DevDoc AI is parsing your codebase, discovering API routes, counting controllers, models, and identifying technologies.
+        </p>
+        <div className="mt-8 flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-800 border border-slate-750 text-xs text-indigo-400 font-mono">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          <span>AST TOKENIZATION IN PROGRESS...</span>
+        </div>
       </div>
     );
   }
@@ -349,22 +435,25 @@ export default function ProjectDetails() {
 
           </div>
 
-          {/* RIGHT SIDE: Upload section (Visually Disabled) */}
+          {/* RIGHT SIDE: Upload section (Unlocked & Fully Functional) */}
           <div className="lg:col-span-1">
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs relative overflow-hidden select-none">
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs relative overflow-hidden">
               
-              {/* Overlay shading block to emphasize visual lock */}
-              <div className="absolute inset-0 bg-slate-50/40 backdrop-blur-[0.5px] pointer-events-none z-10"></div>
-              
-              <div className="relative z-20 space-y-6">
+              <div className="space-y-6">
                 <div className="flex items-center justify-between">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-100 text-slate-400">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
                     <Upload className="h-5.5 w-5.5" />
                   </div>
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800 ring-1 ring-inset ring-amber-600/20 font-mono">
-                    <Lock className="h-3.5 w-3.5 text-amber-600 animate-pulse" />
-                    <span>LOCKED</span>
-                  </span>
+                  {project.analysis_status === "Completed" ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-700 ring-1 ring-inset ring-green-600/10 font-mono">
+                      <Check className="h-3.5 w-3.5" />
+                      <span>ANALYZED</span>
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600 font-mono">
+                      <span>READY</span>
+                    </span>
+                  )}
                 </div>
 
                 <div>
@@ -372,33 +461,82 @@ export default function ProjectDetails() {
                     Upload Codebase
                   </h3>
                   <p className="mt-2 text-sm text-slate-500 leading-relaxed">
-                    Upload backend archives or drag files directly here to start AST tokenization.
+                    Upload your backend .zip archive here to trigger automatic intelligent parsing and API discovery.
                   </p>
                 </div>
 
-                {/* Simulated Drag & Drop Zone */}
-                <div className="border-2 border-dashed border-slate-200 rounded-xl p-8 text-center bg-slate-50/50 flex flex-col items-center justify-center gap-3">
-                  <Upload className="h-8 w-8 text-slate-300" />
-                  <div className="text-sm text-slate-400 font-semibold">
-                    Drag files here, or click to browse
-                  </div>
-                  <span className="text-[11px] text-slate-400 font-mono">Supports .zip, .tar.gz up to 50MB</span>
-                </div>
+                {/* File Drop/Click Zone */}
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileChange}
+                  accept=".zip"
+                  className="hidden"
+                />
 
-                {/* Milestone Limit Banner */}
-                <div className="rounded-xl bg-amber-50 p-4 border border-amber-100/80 flex items-start gap-3">
-                  <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
-                  <div className="text-sm text-amber-800 font-semibold leading-relaxed">
-                    Project upload will be available in the next milestone.
-                  </div>
-                </div>
-
-                <button
-                  disabled
-                  className="w-full flex justify-center items-center gap-2 rounded-xl bg-slate-200 px-4 py-3.5 text-sm font-semibold text-slate-400 cursor-not-allowed"
+                <div
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  onClick={() => fileInputRef.current?.click()}
+                  className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer flex flex-col items-center justify-center gap-3 transition-all ${
+                    dragOver
+                      ? "border-indigo-500 bg-indigo-50/50 animate-pulse"
+                      : "border-slate-200 bg-slate-50/50 hover:bg-slate-50"
+                  }`}
                 >
-                  <span>Parse Codebase</span>
-                </button>
+                  <Upload className={`h-8 w-8 transition-colors ${dragOver ? "text-indigo-600" : "text-slate-400"}`} />
+                  
+                  {selectedFile ? (
+                    <div className="space-y-1">
+                      <div className="text-sm font-semibold text-slate-800 truncate max-w-[200px]">
+                        {selectedFile.name}
+                      </div>
+                      <div className="text-xs text-slate-400 font-mono">
+                        {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="text-sm text-slate-600 font-semibold">
+                        Drag zip here, or click to browse
+                      </div>
+                      <span className="text-[11px] text-slate-400 font-mono">Supports .zip archives up to 50MB</span>
+                    </>
+                  )}
+                </div>
+
+                {selectedFile && (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleUploadSubmit}
+                      className="flex-1 flex justify-center items-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-md hover:bg-indigo-500 transition-all cursor-pointer"
+                    >
+                      <span>Parse Codebase</span>
+                    </button>
+                    <button
+                      onClick={() => setSelectedFile(null)}
+                      className="p-3 border border-slate-200 hover:bg-slate-50 rounded-xl text-slate-500 hover:text-slate-800 transition-all cursor-pointer flex items-center justify-center"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
+
+                {/* View Latest Discovery card if project is analyzed */}
+                {project.analysis_status === "Completed" && (
+                  <div className="rounded-xl bg-indigo-50/50 border border-indigo-100 p-4 space-y-3">
+                    <div className="text-xs text-indigo-950 font-medium leading-relaxed">
+                      This project has been analyzed successfully. You can view the full interactive dashboard including endpoints, controllers, models, and technologies.
+                    </div>
+                    <Link
+                      to={`/projects/${project.id}/analysis`}
+                      className="w-full inline-flex justify-center items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 transition-all cursor-pointer"
+                    >
+                      <span>View Project Discovery</span>
+                    </Link>
+                  </div>
+                )}
               </div>
 
             </div>

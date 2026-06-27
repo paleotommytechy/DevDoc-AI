@@ -65,6 +65,7 @@ devdoc-ai/
 │   │   ├── routes/           # REST endpoints
 │   │   ├── middlewares/      # Express middlewares (auth, errors, rate limits)
 │   │   ├── services/         # Core business logic / AI services (Phase 1+)
+│   │   ├── scanner/          # Project Scanner module (parsers & route detectors)
 │   │   ├── utils/            # Shared loggers and utils
 │   │   ├── types/            # Type definitions
 │   │   ├── prompts/          # AI prompt templates (Phase 1+)
@@ -146,6 +147,37 @@ npm run dev
 cd frontend
 npm run dev
 ```
+
+---
+
+## 🔍 Intelligent Project Scanner
+
+DevDoc AI includes an Intelligent Project Scanner that parses uploaded Node.js/Express-style backend codebase archives in-memory to automatically discover backend layouts, models, routers, and routes.
+
+### Supported Frameworks
+- **Express** (High-fidelity detection via dependency analysis and route invocation matching)
+- **NestJS** (Core package dependency scanning)
+- **Fastify** (Package dependency matching)
+
+### Supported Languages
+- **TypeScript** (.ts file counts and config check)
+- **JavaScript** (.js, .jsx, .tsx file check)
+
+### Scanner Workflow
+1. **ZIP Upload**: The client uploads a ZIP codebase to `/api/projects/:id/upload` containing the backend source.
+2. **In-Memory Decompression**: The backend uses `adm-zip` to extract archive entries in-memory without polluting the server filesystem.
+3. **AST Tokenizer & Heuristic Analysis**:
+   - Counts file extensions to identify primary programming language.
+   - Searches `package.json` to extract project name, framework, auth middleware, and database clients.
+   - Crawls controller directories and files matching `*Controller.*`.
+   - Crawls model directories and schemas.
+   - Crawls middleware directories.
+4. **Regex-Based Route Discovery**: Scans and parses Express-style route usages (e.g. `router.get('/path')`, `app.post('/users')`) to extract HTTP Methods, Enpoints, and file line definitions.
+5. **Database Storage**: Compiles the scanned metadata and saves it directly to the PostgreSQL project database.
+
+### Known Limitations
+- Heavy obfuscation or highly complex nested routers might skip detection if they do not match standard Express route patterns.
+- Currently supports Express as the primary deep route scanning engine. NestJS and Fastify are supported for framework, dependency, database, and authenticator counting.
 
 ---
 

@@ -25,6 +25,17 @@ export interface Project {
   status: string;
   created_at: string;
   updated_at: string;
+  framework?: string | null;
+  language?: string | null;
+  route_count?: number | null;
+  controller_count?: number | null;
+  middleware_count?: number | null;
+  model_count?: number | null;
+  database?: string | null;
+  authentication?: string | null;
+  analysis_status?: string | null;
+  analysis_completed_at?: string | null;
+  routes_discovered?: any[] | string | null;
 }
 
 export interface ApiResponse<T> {
@@ -85,6 +96,17 @@ export const projectsApi = {
 
   delete: async (id: string): Promise<ApiResponse<null>> => {
     const res = await api.delete(`/projects/${id}`);
+    return res.data;
+  },
+
+  uploadCodebase: async (id: string, file: File): Promise<ApiResponse<{ project: any }>> => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await api.post(`/projects/${id}/upload`, formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
     return res.data;
   },
 };

@@ -37,10 +37,10 @@ app.use("/api", rateLimiter);
 // Mount all API routes
 app.use("/api", apiRoutes);
 
-// Handle 404
-app.use(notFoundHandler);
+// Handle 404 for API routes ONLY
+app.use("/api", notFoundHandler);
 
-// Handle global errors
-app.use(errorHandler);
+// Handle global errors for API routes ONLY
+app.use("/api", errorHandler);
 
 export default app;

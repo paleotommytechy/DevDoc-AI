@@ -216,3 +216,36 @@ export const projectsApi = {
     return res.data;
   },
 };
+
+export const documentationApi = {
+  getDocumentation: async (projectId: string): Promise<ApiResponse<{ readme: string; api: string }>> => {
+    const res = await api.get(`/projects/${projectId}/documentation`);
+    return res.data;
+  },
+
+  downloadReadme: async (projectId: string): Promise<void> => {
+    const res = await api.get(`/projects/${projectId}/documentation/download/readme`, { responseType: "blob" });
+    const blob = new Blob([res.data], { type: "text/markdown" });
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = downloadUrl;
+    link.download = "README.md";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(downloadUrl);
+  },
+
+  downloadApi: async (projectId: string): Promise<void> => {
+    const res = await api.get(`/projects/${projectId}/documentation/download/api`, { responseType: "blob" });
+    const blob = new Blob([res.data], { type: "text/markdown" });
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = downloadUrl;
+    link.download = "API.md";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(downloadUrl);
+  },
+};

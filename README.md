@@ -181,7 +181,22 @@ DevDoc AI includes an Intelligent Project Scanner that parses uploaded Node.js/E
 
 ---
 
-## 🗺️ Future Roadmap
-- **Phase 1: Code Parsing & AST Extraction** - Support parsing JS, TS, Python files to locate route structures.
-- **Phase 2: AI Summarizer Integration** - Stream AST details to Gemini to generate functional summaries.
-- **Phase 3: Interactive Developer Portal** - Render documentation in standard SwaggerUI or a clean modern React interactive hub.
+## 📝 Automated Documentation Generator
+
+DevDoc AI compiles scanned project AST metadata into beautifully structured markdown files deterministically on-device without external model dependencies, ensuring 100% data security, ultra-fast generation speeds, and reliable compliance.
+
+### Generated Documents
+- **README.md**: Standardized project overview specifying Project Name, detected Framework, Language, Database, Authentication, Total Discovered Routes, and metric counts for Controllers, Models, and Middlewares.
+- **API.md**: High-contrast API specification manual detailing Project Overview, API Statistics, and a complete markdown registry of all discovered endpoints (HTTP Method, Route Endpoint, Source Implementation File).
+
+### REST API Reference
+- **GET** `/api/projects/:id/documentation` - Fetch or lazy-generate both README and API specs from existing metadata records.
+- **GET** `/api/projects/:id/documentation/download/readme` - Download the fully formatted `README.md` file directly.
+- **GET** `/api/projects/:id/documentation/download/api` - Download the compiled `API.md` file directly.
+
+---
+
+## 🗺️ Completed Milestones & Roadmap
+- **Phase 1: Code Parsing & AST Extraction** - Completed! Support parsing Express JS/TS structures to extract routes in-memory.
+- **Phase 2: Automated Markdown Documentation** - Completed! Instant, template-based generation of README.md and API.md files.
+- **Phase 3: Interactive Developer Portal** - In-progress! Native React markdown preview with download triggers.

@@ -9,6 +9,7 @@ import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import ProjectDetails from "./pages/ProjectDetails";
 import ProjectAnalysis from "./pages/ProjectAnalysis";
+import DocumentationPreview from "./pages/DocumentationPreview";
 import { Loader2 } from "lucide-react";
 
 // Initialize TanStack React Query Client
@@ -111,6 +112,14 @@ export default function App() {
                 element={
                   <ProtectedRoute>
                     <ProjectAnalysis />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/projects/:id/documentation"
+                element={
+                  <ProtectedRoute>
+                    <DocumentationPreview />
                   </ProtectedRoute>
                 }
               />

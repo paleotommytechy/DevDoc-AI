@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { projectsApi } from "../services/api";
+import { projectsApi, documentationApi } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { 
   ArrowLeft, 
@@ -18,7 +18,9 @@ import {
   Calendar,
   Loader2,
   Lock,
-  Globe
+  Globe,
+  Eye,
+  Download
 } from "lucide-react";
 import { motion } from "motion/react";
 
@@ -27,6 +29,32 @@ export default function ProjectAnalysis() {
   const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [methodFilter, setMethodFilter] = useState("ALL");
+  const [downloadingReadme, setDownloadingReadme] = useState(false);
+  const [downloadingApi, setDownloadingApi] = useState(false);
+
+  const handleDownloadReadme = async () => {
+    if (!id) return;
+    try {
+      setDownloadingReadme(true);
+      await documentationApi.downloadReadme(id);
+    } catch (err) {
+      console.error("Error downloading README:", err);
+    } finally {
+      setDownloadingReadme(false);
+    }
+  };
+
+  const handleDownloadApi = async () => {
+    if (!id) return;
+    try {
+      setDownloadingApi(true);
+      await documentationApi.downloadApi(id);
+    } catch (err) {
+      console.error("Error downloading API Docs:", err);
+    } finally {
+      setDownloadingApi(false);
+    }
+  };
 
   // Fetch project details (which contains the scanner results)
   const { data: project, isLoading, isError } = useQuery({
@@ -197,19 +225,59 @@ export default function ProjectAnalysis() {
 
         {/* Title Section */}
         <div className="border-b border-slate-200 pb-5">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div>
               <h1 className="text-3xl font-bold text-slate-950 tracking-tight">{project.name}</h1>
               <p className="mt-1 text-sm text-slate-500 leading-relaxed">
                 Discovered backend blueprints, controller instances, API routes, and architectural patterns.
               </p>
             </div>
-            {project.analysis_completed_at && (
-              <div className="flex items-center gap-1.5 text-xs font-medium text-slate-400 bg-white border border-slate-200/80 rounded-xl px-3.5 py-2 shadow-xs">
-                <Calendar className="h-4 w-4 text-slate-400" />
-                <span>Analyzed: {new Date(project.analysis_completed_at).toLocaleString()}</span>
-              </div>
-            )}
+            <div className="flex flex-wrap items-center gap-3">
+              {project.analysis_completed_at && (
+                <div className="flex items-center gap-1.5 text-xs font-medium text-slate-400 bg-white border border-slate-200/80 rounded-xl px-3.5 py-2 shadow-xs">
+                  <Calendar className="h-4 w-4 text-slate-400" />
+                  <span>Analyzed: {new Date(project.analysis_completed_at).toLocaleString()}</span>
+                </div>
+              )}
+              {project.analysis_status?.toLowerCase() === "completed" && (
+                <>
+                  <Link
+                    id="btn-preview-docs"
+                    to={`/projects/${id}/documentation`}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 px-4 py-2 text-sm font-semibold text-white shadow-xs transition-all cursor-pointer"
+                  >
+                    <Eye className="h-4 w-4" />
+                    <span>Preview Docs</span>
+                  </Link>
+                  <button
+                    id="btn-download-readme"
+                    onClick={handleDownloadReadme}
+                    disabled={downloadingReadme}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-white hover:bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700 border border-slate-200 shadow-xs transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    {downloadingReadme ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Download className="h-4 w-4 text-slate-500" />
+                    )}
+                    <span>Download README</span>
+                  </button>
+                  <button
+                    id="btn-download-api"
+                    onClick={handleDownloadApi}
+                    disabled={downloadingApi}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-white hover:bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700 border border-slate-200 shadow-xs transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    {downloadingApi ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Download className="h-4 w-4 text-slate-500" />
+                    )}
+                    <span>Download API Docs</span>
+                  </button>
+                </>
+              )}
+            </div>
           </div>
         </div>
 

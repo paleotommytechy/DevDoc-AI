@@ -85,3 +85,40 @@ This document outlines manual and edge-case testing procedures to verify the cor
 - **Expected Results**:
   - Scanning completes quickly (typically <3 seconds) because operations are fully processed in-memory using buffer streams.
   - All routes are correctly populated and searchable using the table's search filter.
+
+---
+
+## 📝 Sprint 4 Documentation Testing Scenarios
+
+### 8. Documentation Generation & DB Caching
+- **Objective**: Verify that markdown documentation templates are correctly populated from scanner metrics and saved in the database.
+- **Setup**: Log in and upload a valid zip project codebase (e.g. standard Express project).
+- **Execution**: Navigate to the Project Analysis page for the uploaded project. Click the "Preview Docs" button or perform a GET request on `/api/projects/:id/documentation`.
+- **Expected Results**:
+  - Code parses successfully and lazy-generates documentation if it does not already exist.
+  - The documentation includes the project's details (Framework, Language, Database, Authentication, counts, and routes).
+  - Inspecting the backend service indicates a database or local state cache is established. Subsequent requests for documentation retrieve this cached copy instantly instead of regenerating.
+
+### 9. Documentation Tab Preview
+- **Objective**: Verify that the user can seamlessly switch between README and API previews.
+- **Setup**: Complete codebase analysis for a project and click "Preview Docs".
+- **Implementation Check**: The app renders the Documentation Preview page.
+- **Execution**: 
+  - Click on the "README.md Preview" tab.
+  - Click on the "API.md Specification" tab.
+- **Expected Results**:
+  - The active markdown file changes instantly.
+  - **README.md** shows correct framework details, file metrics, and descriptions.
+  - **API.md** renders a clean table of all discovered Express routes, detailing HTTP method verbs, path locations, and source files.
+
+### 10. Markdown Download
+- **Objective**: Verify that the user can download generated `README.md` and `API.md` files as standalone markdown assets.
+- **Setup**: Open the Project Analysis or Documentation Preview dashboard for an analyzed project.
+- **Execution**: 
+  - Click the "Download README" button.
+  - Click the "Download API Docs" button.
+- **Expected Results**:
+  - Download begins instantly with no browser errors.
+  - Files are downloaded as `README.md` and `API.md` respectively.
+  - Opening the files verifies they contain fully valid Markdown content matching the live preview.
+

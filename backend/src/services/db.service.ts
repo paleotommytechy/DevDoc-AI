@@ -30,6 +30,8 @@ export interface ProjectEntity {
   analysis_status?: string | null;
   analysis_completed_at?: Date | null;
   routes_discovered?: any[] | null;
+  readme_markdown?: string | null;
+  api_markdown?: string | null;
 }
 
 class DbService {
@@ -112,7 +114,9 @@ class DbService {
         { name: "authentication", type: "VARCHAR(255)" },
         { name: "analysis_status", type: "VARCHAR(50) DEFAULT 'Not Started'" },
         { name: "analysis_completed_at", type: "TIMESTAMP WITH TIME ZONE" },
-        { name: "routes_discovered", type: "JSONB" }
+        { name: "routes_discovered", type: "JSONB" },
+        { name: "readme_markdown", type: "TEXT" },
+        { name: "api_markdown", type: "TEXT" }
       ];
 
       // Get existing columns
@@ -435,6 +439,8 @@ class DbService {
       analysis_status?: string | null;
       analysis_completed_at?: Date | null;
       routes_discovered?: any[] | null;
+      readme_markdown?: string | null;
+      api_markdown?: string | null;
     }
   ): Promise<ProjectEntity | null> {
     if (this.isFallback) {

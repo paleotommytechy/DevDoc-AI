@@ -44,6 +44,13 @@ DevDoc AI uses two primary tables: `users` and `projects`. The system manages mi
 5. Paste the copied SQL contents into the editor.
 6. Click **Run** (or press `Cmd + Enter` / `Ctrl + Enter`).
 
+### Step-by-Step Permissions & RLS Setup (Fixing Registration/Login Errors):
+If you encounter errors like `new row violates row-level security policy for table "users"`, you need to configure your database permissions:
+1. Copy the contents of the permissions file located in the project at `/backend/supabase-rls-policies.sql`.
+2. Open your **Supabase Dashboard** -> **SQL Editor** -> **New query**.
+3. Paste the contents into the editor.
+4. Select either **Option A** (Disabling RLS - recommended for backends) or **Option B** (Configuring explicit policies), and click **Run**.
+
 ### Schema Description:
 - **`users` Table**: Contains account profiles with UUID identifiers, secure encrypted passwords (`bcrypt`), and creation timestamps.
 - **`projects` Table**: Contains monitored codebases linked to the corresponding creator.

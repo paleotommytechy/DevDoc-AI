@@ -174,7 +174,7 @@ export default function Home() {
                       <span className="font-mono text-xs text-slate-700 font-semibold">/api/users/&#123;id&#125;</span>
                     </div>
                     <div className="h-px bg-slate-200/80 my-1"></div>
-                    <div class="flex flex-col gap-1">
+                    <div className="flex flex-col gap-1">
                       <div className="h-2 w-24 rounded bg-slate-200"></div>
                       <div className="h-1.5 w-full rounded bg-slate-200/60"></div>
                       <div className="h-1.5 w-3/4 rounded bg-slate-200/60"></div>

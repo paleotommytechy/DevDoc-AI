@@ -40,17 +40,21 @@ api.interceptors.response.use(
       const requestUrl = error.config?.url || "";
       const requestMethod = error.config?.method?.toUpperCase() || "";
 
-      console.group(`%c🖥️ [FRONTEND LOG: BACKEND API ERROR (${status})]`, "color: #dc2626; font-weight: bold; font-size: 13px;");
-      console.error(`Origin: Backend API Server (${requestMethod} ${requestUrl})`);
-      console.error(`HTTP Status Code: ${status}`);
-      console.error(`Response Message: ${backendMessage}`);
-      console.error("Full Error Response Data:", data);
-      console.groupEnd();
+      const isMeRequest = status === 401 && (requestUrl === "/auth/me" || requestUrl.includes("/me"));
+
+      if (!isMeRequest) {
+        console.group(`%c🖥️ [FRONTEND LOG: BACKEND API ERROR (${status})]`, "color: #dc2626; font-weight: bold; font-size: 13px;");
+        console.error(`Origin: Backend API Server (${requestMethod} ${requestUrl})`);
+        console.error(`HTTP Status Code: ${status}`);
+        console.error(`Response Message: ${backendMessage}`);
+        console.error("Full Error Response Data:", data);
+        console.groupEnd();
+      }
 
       // Decide whether to show toast based on HTTP status
       if (status === 401) {
         // Only show if it's not the initial check auth (me)
-        if (requestUrl !== "/auth/me" && !requestUrl.includes("/me")) {
+        if (!isMeRequest) {
           showGlobalToast("Your session has expired. Please log in again.", "warning");
         }
       } else if (status === 403) {
@@ -94,6 +98,11 @@ if (typeof window !== "undefined") {
       // Ignore websocket connection rejections
       const reasonStr = String(event.reason || "");
       if (reasonStr.includes("websocket") || reasonStr.includes("vite")) {
+        return;
+      }
+
+      // Ignore Axios errors since they are already fully handled & logged by the response interceptor
+      if (event.reason && (event.reason.isAxiosError || event.reason.config || axios.isAxiosError(event.reason))) {
         return;
       }
 

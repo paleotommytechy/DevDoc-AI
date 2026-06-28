@@ -9,6 +9,9 @@ import { rateLimiter } from "./middlewares/rateLimit.middleware";
 
 const app = express();
 
+// Trust reverse proxy (e.g. Nginx, Cloud Run load balancers)
+app.set("trust proxy", 1);
+
 // Set security HTTP headers
 app.use(helmet({
   contentSecurityPolicy: false, // Turn off CSP for dev server and preview iframe integration

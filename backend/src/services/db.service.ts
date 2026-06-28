@@ -2,6 +2,7 @@ import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { config } from "../config/index";
 import { logger } from "../utils/logger";
 import crypto from "crypto";
+import pg from "pg";
 
 export interface UserEntity {
   id: string;
@@ -62,6 +63,8 @@ class DbService {
             } else {
               this.isFallback = false;
               logger.info("🔌 Connected to Supabase via JavaScript client successfully.");
+              // Run schema alignment to ensure all dynamic analysis columns are present
+              await this.alignSchema();
             }
           } catch (err) {
             this.isFallback = true;
@@ -75,6 +78,76 @@ class DbService {
     } else {
       logger.warn("⚠️ No Supabase client credentials found (SUPABASE_URL / VITE_SUPABASE_URL and key). Running with in-memory database fallback.");
       this.isFallback = true;
+    }
+  }
+
+  private async alignSchema() {
+    const dbUrl = process.env.DATABASE_URL || config.DATABASE_URL;
+    if (!dbUrl) {
+      logger.info("ℹ️ DATABASE_URL not set, skipping automatic schema alignment.");
+      return;
+    }
+
+    const isSupabase = dbUrl.includes("supabase");
+    const useSsl = isSupabase || dbUrl.includes("elephantsql") || dbUrl.includes("render");
+
+    const client = new pg.Client({
+      connectionString: dbUrl,
+      ssl: useSsl ? { rejectUnauthorized: false } : false,
+    });
+
+    try {
+      logger.info("📡 Running automatic database schema alignment...");
+      await client.connect();
+      
+      // Expected columns and their SQL types for projects table
+      const columnsToCheck = [
+        { name: "framework", type: "VARCHAR(255)" },
+        { name: "language", type: "VARCHAR(255)" },
+        { name: "route_count", type: "INTEGER" },
+        { name: "controller_count", type: "INTEGER" },
+        { name: "middleware_count", type: "INTEGER" },
+        { name: "model_count", type: "INTEGER" },
+        { name: "database", type: "VARCHAR(255)" },
+        { name: "authentication", type: "VARCHAR(255)" },
+        { name: "analysis_status", type: "VARCHAR(50) DEFAULT 'Not Started'" },
+        { name: "analysis_completed_at", type: "TIMESTAMP WITH TIME ZONE" },
+        { name: "routes_discovered", type: "JSONB" }
+      ];
+
+      // Get existing columns
+      const res = await client.query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+        AND table_name = 'projects';
+      `);
+      
+      const existingColumns = res.rows.map(row => row.column_name);
+      
+      if (existingColumns.length === 0) {
+        logger.warn("⚠️ 'projects' table not found in database during schema alignment.");
+        return;
+      }
+
+      for (const col of columnsToCheck) {
+        if (!existingColumns.includes(col.name)) {
+          logger.info(`➕ Adding missing column '${col.name}' to 'projects' table...`);
+          await client.query(`
+            ALTER TABLE projects 
+            ADD COLUMN IF NOT EXISTS ${col.name} ${col.type};
+          `);
+        }
+      }
+      logger.info("✅ Database schema alignment completed successfully.");
+    } catch (err) {
+      logger.error("❌ Failed to perform automatic schema alignment:", err);
+    } finally {
+      try {
+        await client.end();
+      } catch (e) {
+        // Ignore close error
+      }
     }
   }
 

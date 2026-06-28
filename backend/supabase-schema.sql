@@ -20,7 +20,18 @@ CREATE TABLE IF NOT EXISTS projects (
   description TEXT,
   status VARCHAR(50) DEFAULT 'Empty' NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  framework VARCHAR(100),
+  language VARCHAR(100),
+  route_count INTEGER,
+  controller_count INTEGER,
+  middleware_count INTEGER,
+  model_count INTEGER,
+  database VARCHAR(100),
+  authentication VARCHAR(100),
+  analysis_status VARCHAR(50) DEFAULT 'Not Started',
+  analysis_completed_at TIMESTAMP WITH TIME ZONE,
+  routes_discovered JSONB
 );
 
 -- Trigger to automatically update the updated_at timestamp

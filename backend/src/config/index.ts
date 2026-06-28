@@ -9,6 +9,10 @@ const envSchema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   DATABASE_URL: z.string().optional(),
   GEMINI_API_KEY: z.string().optional(),
+  SUPABASE_URL: z.string().optional(),
+  SUPABASE_ANON_KEY: z.string().optional(),
+  VITE_SUPABASE_URL: z.string().optional(),
+  VITE_SUPABASE_PUBLISHABLE_KEY: z.string().optional(),
 });
 
 const parseEnv = () => {

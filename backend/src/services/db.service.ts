@@ -1,9 +1,7 @@
-import pg from "pg";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { config } from "../config/index";
 import { logger } from "../utils/logger";
 import crypto from "crypto";
-
-const { Pool } = pg;
 
 export interface UserEntity {
   id: string;
@@ -34,7 +32,7 @@ export interface ProjectEntity {
 }
 
 class DbService {
-  private pool: pg.Pool | null = null;
+  private supabase: SupabaseClient | null = null;
   private isFallback = true;
 
   // In-memory fallback stores
@@ -42,91 +40,71 @@ class DbService {
   private inMemoryProjects: ProjectEntity[] = [];
 
   constructor() {
-    const dbUrl = process.env.DATABASE_URL || config.DATABASE_URL;
-    if (dbUrl) {
+    const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || config.SUPABASE_URL || config.VITE_SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || config.SUPABASE_ANON_KEY || config.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+    if (supabaseUrl && supabaseKey) {
       try {
-        this.pool = new Pool({
-          connectionString: dbUrl,
-          ssl: dbUrl.includes("supabase") || dbUrl.includes("elephantsql") || dbUrl.includes("render")
-            ? { rejectUnauthorized: false }
-            : false,
+        this.supabase = createClient(supabaseUrl, supabaseKey, {
+          auth: {
+            persistSession: false,
+            autoRefreshToken: false,
+          }
         });
         
-        // Verify connection immediately
-        this.pool.query("SELECT NOW();")
-          .then(() => {
-            this.isFallback = false;
-            logger.info("🔌 Connected to PostgreSQL/Supabase database successfully.");
-            this.initializeDatabaseSchema();
-          })
-          .catch((err) => {
+        // Simple connectivity ping to verify credentials and access using async IIFE
+        (async () => {
+          try {
+            const { error } = await this.supabase!.from("users").select("id").limit(1);
+            if (error) {
+              this.isFallback = true;
+              this.logDetailedSupabaseError(error, supabaseUrl);
+            } else {
+              this.isFallback = false;
+              logger.info("🔌 Connected to Supabase via JavaScript client successfully.");
+            }
+          } catch (err) {
             this.isFallback = true;
-            this.logDetailedDatabaseError(err, dbUrl);
-          });
+            this.logDetailedSupabaseError(err, supabaseUrl);
+          }
+        })();
       } catch (err) {
-        logger.error("❌ Failed to initialize PostgreSQL pool. Falling back to in-memory database.", err);
+        logger.error("❌ Failed to initialize Supabase JS client. Falling back to in-memory database.", err);
         this.isFallback = true;
       }
     } else {
-      logger.warn("⚠️ No DATABASE_URL found in environment. Running with in-memory database fallback.");
+      logger.warn("⚠️ No Supabase client credentials found (SUPABASE_URL / VITE_SUPABASE_URL and key). Running with in-memory database fallback.");
       this.isFallback = true;
     }
   }
 
-  private logDetailedDatabaseError(err: any, dbUrl: string) {
-    const maskedUrl = dbUrl.replace(/:([^:@]+)@/, ":******@");
+  private logDetailedSupabaseError(err: any, supabaseUrl: string) {
     console.error("\n================================================================================");
-    console.error("❌ DATABASE CONNECTION DIAGNOSTIC FAILURE:");
-    console.error(`Database URL:  ${maskedUrl}`);
-    console.error(`Raw Error:     ${err.message || err}`);
+    console.error("❌ SUPABASE CLIENT CONNECTION DIAGNOSTIC FAILURE:");
+    console.error(`Supabase URL:  ${supabaseUrl}`);
+    console.error(`Raw Error:     ${err.message || err.details || JSON.stringify(err)}`);
     console.error("--------------------------------------------------------------------------------");
     
-    const errMsg = String(err.message || "").toLowerCase();
+    const errMsg = String(err.message || err.details || "").toLowerCase();
+    const errCode = String(err.code || "").toLowerCase();
     
-    if (errMsg.includes("self-signed certificate")) {
-      console.error("👉 [DIAGNOSIS: SSL CERTIFICATE ISSUE]");
-      console.error("The database server requires an SSL-secured connection (common with Supabase/ElephantSQL).");
-      console.error("Solution: Make sure your DATABASE_URL has '?sslmode=require' appended to it.");
-    } else if (errMsg.includes("password authentication failed")) {
-      console.error("👉 [DIAGNOSIS: PASSWORD/AUTHENTICATION ERROR]");
-      console.error("The password supplied in your database connection string is incorrect.");
-      console.error("Solution: Verify your password. Note that special characters in passwords must be URL-encoded.");
-    } else if (errMsg.includes("enotfound") || errMsg.includes("getaddrinfo")) {
-      console.error("👉 [DIAGNOSIS: DNS / SERVER UNREACHABLE]");
-      console.error("The server host name could not be resolved.");
-      console.error("Solution: Verify your network connection and double-check the spelling of your database host.");
-    } else if (errMsg.includes("econnrefused") || err.code === "ECONNREFUSED" || errMsg.includes("timeout")) {
-      console.error("👉 [DIAGNOSIS: PORT / FIREWALL / OFFLINE]");
-      console.error("The connection attempt was refused or timed out.");
-      console.error("Solution: Check if the database port is open and the server is running. If using Supabase, make sure your project isn't paused.");
+    if (errMsg.includes("invalid key") || errMsg.includes("invalid api key") || errMsg.includes("api key") || errCode === "pgrst_auth_failed" || errMsg.includes("auth")) {
+      console.error("👉 [DIAGNOSIS: INVALID SUPABASE API KEY / AUTHENTICATION FAILURE]");
+      console.error("The provided API key or Service Role Key is invalid, has expired, or is missing the correct authorization.");
+      console.error("Solution: Check VITE_SUPABASE_PUBLISHABLE_KEY or SUPABASE_ANON_KEY/SUPABASE_SERVICE_ROLE_KEY values.");
+    } else if (errMsg.includes("relation") && errMsg.includes("does not exist")) {
+      console.error("👉 [DIAGNOSIS: MISSING TABLE / SCHEMA ERROR]");
+      console.error("The 'users' or 'projects' table does not exist in your Supabase database.");
+      console.error("Solution: Go to your Supabase SQL Editor and execute '/backend/supabase-schema.sql'.");
+    } else if (errMsg.includes("failed to fetch") || errMsg.includes("enotfound") || errMsg.includes("getaddrinfo")) {
+      console.error("👉 [DIAGNOSIS: DNS / NETWORK UNREACHABLE]");
+      console.error("Could not reach the Supabase host name. The connection failed to fetch or timed out.");
+      console.error("Solution: Check your internet connection and verify that your SUPABASE_URL matches the project-ref exactly.");
     } else {
-      console.error("👉 [DIAGNOSIS: GENERAL CONNECTION FAILURE]");
-      console.error("Please inspect database URL credentials and local network outbound port permissions.");
+      console.error("👉 [DIAGNOSIS: DATABASE ACCESS PERMISSION ERROR]");
+      console.error("Verify your table schemas, database credentials, and any active Row Level Security (RLS) policies.");
     }
     console.error("================================================================================\n");
-  }
-
-  private async initializeDatabaseSchema() {
-    if (!this.pool) return;
-    try {
-      const query = `
-        ALTER TABLE projects ADD COLUMN IF NOT EXISTS framework VARCHAR(100);
-        ALTER TABLE projects ADD COLUMN IF NOT EXISTS language VARCHAR(50);
-        ALTER TABLE projects ADD COLUMN IF NOT EXISTS route_count INTEGER DEFAULT 0;
-        ALTER TABLE projects ADD COLUMN IF NOT EXISTS controller_count INTEGER DEFAULT 0;
-        ALTER TABLE projects ADD COLUMN IF NOT EXISTS middleware_count INTEGER DEFAULT 0;
-        ALTER TABLE projects ADD COLUMN IF NOT EXISTS model_count INTEGER DEFAULT 0;
-        ALTER TABLE projects ADD COLUMN IF NOT EXISTS "database" VARCHAR(100);
-        ALTER TABLE projects ADD COLUMN IF NOT EXISTS authentication VARCHAR(100);
-        ALTER TABLE projects ADD COLUMN IF NOT EXISTS analysis_status VARCHAR(50) DEFAULT 'Pending';
-        ALTER TABLE projects ADD COLUMN IF NOT EXISTS analysis_completed_at TIMESTAMP WITH TIME ZONE;
-        ALTER TABLE projects ADD COLUMN IF NOT EXISTS routes_discovered JSONB;
-      `;
-      await this.pool.query(query);
-      logger.info("✅ Database schema initialized/updated successfully.");
-    } catch (err) {
-      logger.error("❌ Failed to initialize/update database schema:", err);
-    }
   }
 
   // --- Users CRUD ---
@@ -138,9 +116,23 @@ class DbService {
       return user ? { ...user } : null;
     }
 
-    const query = "SELECT * FROM users WHERE LOWER(email) = $1 LIMIT 1";
-    const res = await this.pool!.query(query, [cleanEmail]);
-    return res.rows[0] || null;
+    try {
+      const { data, error } = await this.supabase!
+        .from("users")
+        .select("*")
+        .ilike("email", cleanEmail)
+        .limit(1)
+        .maybeSingle();
+
+      if (error) {
+        logger.error("Error fetching user by email from Supabase:", error);
+        throw error;
+      }
+      return data;
+    } catch (err) {
+      logger.error("DB Error in getUserByEmail:", err);
+      throw err;
+    }
   }
 
   async getUserById(id: string): Promise<UserEntity | null> {
@@ -149,9 +141,23 @@ class DbService {
       return user ? { ...user } : null;
     }
 
-    const query = "SELECT * FROM users WHERE id = $1 LIMIT 1";
-    const res = await this.pool!.query(query, [id]);
-    return res.rows[0] || null;
+    try {
+      const { data, error } = await this.supabase!
+        .from("users")
+        .select("*")
+        .eq("id", id)
+        .limit(1)
+        .maybeSingle();
+
+      if (error) {
+        logger.error("Error fetching user by id from Supabase:", error);
+        throw error;
+      }
+      return data;
+    } catch (err) {
+      logger.error("DB Error in getUserById:", err);
+      throw err;
+    }
   }
 
   async createUser(email: string, passwordHash: string): Promise<UserEntity> {
@@ -167,13 +173,22 @@ class DbService {
       return { ...newUser };
     }
 
-    const query = `
-      INSERT INTO users (email, password)
-      VALUES ($1, $2)
-      RETURNING *
-    `;
-    const res = await this.pool!.query(query, [cleanEmail, passwordHash]);
-    return res.rows[0];
+    try {
+      const { data, error } = await this.supabase!
+        .from("users")
+        .insert({ email: cleanEmail, password: passwordHash })
+        .select()
+        .single();
+
+      if (error) {
+        logger.error("Error creating user in Supabase:", error);
+        throw error;
+      }
+      return data;
+    } catch (err) {
+      logger.error("DB Error in createUser:", err);
+      throw err;
+    }
   }
 
   // --- Projects CRUD ---
@@ -194,13 +209,22 @@ class DbService {
       return { ...newProject };
     }
 
-    const query = `
-      INSERT INTO projects (user_id, name, description, status)
-      VALUES ($1, $2, $3, $4)
-      RETURNING *
-    `;
-    const res = await this.pool!.query(query, [userId, name, description, "Empty"]);
-    return res.rows[0];
+    try {
+      const { data, error } = await this.supabase!
+        .from("projects")
+        .insert({ user_id: userId, name, description, status: "Empty" })
+        .select()
+        .single();
+
+      if (error) {
+        logger.error("Error creating project in Supabase:", error);
+        throw error;
+      }
+      return data;
+    } catch (err) {
+      logger.error("DB Error in createProject:", err);
+      throw err;
+    }
   }
 
   async getProjectsByUserId(userId: string): Promise<ProjectEntity[]> {
@@ -210,9 +234,22 @@ class DbService {
         .map((p) => ({ ...p }));
     }
 
-    const query = "SELECT * FROM projects WHERE user_id = $1 ORDER BY created_at DESC";
-    const res = await this.pool!.query(query, [userId]);
-    return res.rows;
+    try {
+      const { data, error } = await this.supabase!
+        .from("projects")
+        .select("*")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        logger.error("Error getting projects from Supabase:", error);
+        throw error;
+      }
+      return data || [];
+    } catch (err) {
+      logger.error("DB Error in getProjectsByUserId:", err);
+      throw err;
+    }
   }
 
   async getProjectByIdAndUserId(id: string, userId: string): Promise<ProjectEntity | null> {
@@ -221,9 +258,24 @@ class DbService {
       return p ? { ...p } : null;
     }
 
-    const query = "SELECT * FROM projects WHERE id = $1 AND user_id = $2 LIMIT 1";
-    const res = await this.pool!.query(query, [id, userId]);
-    return res.rows[0] || null;
+    try {
+      const { data, error } = await this.supabase!
+        .from("projects")
+        .select("*")
+        .eq("id", id)
+        .eq("user_id", userId)
+        .limit(1)
+        .maybeSingle();
+
+      if (error) {
+        logger.error("Error getting project by id from Supabase:", error);
+        throw error;
+      }
+      return data;
+    } catch (err) {
+      logger.error("DB Error in getProjectByIdAndUserId:", err);
+      throw err;
+    }
   }
 
   async updateProject(
@@ -245,39 +297,27 @@ class DbService {
       return { ...updated };
     }
 
-    const setFields: string[] = [];
-    const values: any[] = [id, userId];
-    let counter = 3;
+    try {
+      const fieldsToUpdate: any = { ...updates };
+      fieldsToUpdate.updated_at = new Date().toISOString();
 
-    if (updates.name !== undefined) {
-      setFields.push(`name = $${counter++}`);
-      values.push(updates.name);
+      const { data, error } = await this.supabase!
+        .from("projects")
+        .update(fieldsToUpdate)
+        .eq("id", id)
+        .eq("user_id", userId)
+        .select()
+        .maybeSingle();
+
+      if (error) {
+        logger.error("Error updating project in Supabase:", error);
+        throw error;
+      }
+      return data;
+    } catch (err) {
+      logger.error("DB Error in updateProject:", err);
+      throw err;
     }
-    if (updates.description !== undefined) {
-      setFields.push(`description = $${counter++}`);
-      values.push(updates.description);
-    }
-    if (updates.status !== undefined) {
-      setFields.push(`status = $${counter++}`);
-      values.push(updates.status);
-    }
-
-    if (setFields.length === 0) {
-      return this.getProjectByIdAndUserId(id, userId);
-    }
-
-    // Always update updated_at
-    setFields.push(`updated_at = NOW()`);
-
-    const query = `
-      UPDATE projects
-      SET ${setFields.join(", ")}
-      WHERE id = $1 AND user_id = $2
-      RETURNING *
-    `;
-
-    const res = await this.pool!.query(query, values);
-    return res.rows[0] || null;
   }
 
   async deleteProject(id: string, userId: string): Promise<boolean> {
@@ -288,9 +328,22 @@ class DbService {
       return true;
     }
 
-    const query = "DELETE FROM projects WHERE id = $1 AND user_id = $2";
-    const res = await this.pool!.query(query, [id, userId]);
-    return (res.rowCount ?? 0) > 0;
+    try {
+      const { error, count } = await this.supabase!
+        .from("projects")
+        .delete({ count: "exact" })
+        .eq("id", id)
+        .eq("user_id", userId);
+
+      if (error) {
+        logger.error("Error deleting project from Supabase:", error);
+        throw error;
+      }
+      return count !== null && count > 0;
+    } catch (err) {
+      logger.error("DB Error in deleteProject:", err);
+      throw err;
+    }
   }
 
   async updateProjectScanResults(
@@ -325,74 +378,27 @@ class DbService {
       return { ...updated };
     }
 
-    const setFields: string[] = [];
-    const values: any[] = [id, userId];
-    let counter = 3;
+    try {
+      const fieldsToUpdate: any = { ...results };
+      fieldsToUpdate.updated_at = new Date().toISOString();
 
-    if (results.status !== undefined) {
-      setFields.push(`status = $${counter++}`);
-      values.push(results.status);
-    }
-    if (results.framework !== undefined) {
-      setFields.push(`framework = $${counter++}`);
-      values.push(results.framework);
-    }
-    if (results.language !== undefined) {
-      setFields.push(`language = $${counter++}`);
-      values.push(results.language);
-    }
-    if (results.route_count !== undefined) {
-      setFields.push(`route_count = $${counter++}`);
-      values.push(results.route_count);
-    }
-    if (results.controller_count !== undefined) {
-      setFields.push(`controller_count = $${counter++}`);
-      values.push(results.controller_count);
-    }
-    if (results.middleware_count !== undefined) {
-      setFields.push(`middleware_count = $${counter++}`);
-      values.push(results.middleware_count);
-    }
-    if (results.model_count !== undefined) {
-      setFields.push(`model_count = $${counter++}`);
-      values.push(results.model_count);
-    }
-    if (results.database !== undefined) {
-      setFields.push(`"database" = $${counter++}`);
-      values.push(results.database);
-    }
-    if (results.authentication !== undefined) {
-      setFields.push(`authentication = $${counter++}`);
-      values.push(results.authentication);
-    }
-    if (results.analysis_status !== undefined) {
-      setFields.push(`analysis_status = $${counter++}`);
-      values.push(results.analysis_status);
-    }
-    if (results.analysis_completed_at !== undefined) {
-      setFields.push(`analysis_completed_at = $${counter++}`);
-      values.push(results.analysis_completed_at);
-    }
-    if (results.routes_discovered !== undefined) {
-      setFields.push(`routes_discovered = $${counter++}`);
-      values.push(JSON.stringify(results.routes_discovered));
-    }
+      const { data, error } = await this.supabase!
+        .from("projects")
+        .update(fieldsToUpdate)
+        .eq("id", id)
+        .eq("user_id", userId)
+        .select()
+        .maybeSingle();
 
-    if (setFields.length === 0) {
-      return this.getProjectByIdAndUserId(id, userId);
+      if (error) {
+        logger.error("Error updating project scan results in Supabase:", error);
+        throw error;
+      }
+      return data;
+    } catch (err) {
+      logger.error("DB Error in updateProjectScanResults:", err);
+      throw err;
     }
-
-    setFields.push(`updated_at = NOW()`);
-
-    const query = `
-      UPDATE projects
-      SET ${setFields.join(", ")}
-      WHERE id = $1 AND user_id = $2
-      RETURNING *
-    `;
-
-    const res = await this.pool!.query(query, values);
-    return res.rows[0] || null;
   }
 }
 

@@ -41,6 +41,7 @@ class DbService {
   // In-memory fallback stores
   private inMemoryUsers: UserEntity[] = [];
   private inMemoryProjects: ProjectEntity[] = [];
+  private inMemoryEndpoints: any[] = [];
 
   constructor() {
     const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || config.SUPABASE_URL || config.VITE_SUPABASE_URL;
@@ -143,6 +144,32 @@ class DbService {
           `);
         }
       }
+
+      // Ensure endpoints table exists
+      logger.info("📡 Ensuring 'endpoints' table exists in database...");
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS endpoints (
+          id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+          project_id UUID REFERENCES projects(id) ON DELETE CASCADE NOT NULL,
+          method VARCHAR(15) NOT NULL,
+          route VARCHAR(255) NOT NULL,
+          controller VARCHAR(255),
+          source_file VARCHAR(255),
+          middleware TEXT[],
+          authentication_required BOOLEAN DEFAULT false NOT NULL,
+          validation_library VARCHAR(50),
+          request_schema JSONB DEFAULT '{}'::jsonb,
+          response_schema JSONB DEFAULT '{}'::jsonb,
+          sample_request JSONB DEFAULT '{}'::jsonb,
+          sample_response JSONB DEFAULT '{}'::jsonb,
+          query_parameters TEXT[] DEFAULT '{}'::text[],
+          path_parameters TEXT[] DEFAULT '{}'::text[],
+          response_status_codes INTEGER[] DEFAULT '{}'::integer[],
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
+        );
+      `);
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_endpoints_project_id ON endpoints(project_id);`);
+
       logger.info("✅ Database schema alignment completed successfully.");
     } catch (err) {
       logger.error("❌ Failed to perform automatic schema alignment:", err);
@@ -476,6 +503,141 @@ class DbService {
       return data;
     } catch (err) {
       logger.error("DB Error in updateProjectScanResults:", err);
+      throw err;
+    }
+  }
+
+  // --- Endpoints CRUD ---
+
+  async saveProjectEndpoints(projectId: string, endpoints: any[]): Promise<any[]> {
+    if (this.isFallback) {
+      // Clear existing endpoints for this project
+      this.inMemoryEndpoints = this.inMemoryEndpoints.filter(e => e.project_id !== projectId);
+      
+      const saved = endpoints.map(ep => ({
+        id: crypto.randomUUID(),
+        project_id: projectId,
+        method: ep.method,
+        route: ep.route,
+        controller: ep.controller,
+        source_file: ep.sourceFile,
+        middleware: ep.middleware || [],
+        authentication_required: ep.authenticationRequired || false,
+        validation_library: ep.validationLibrary,
+        request_schema: ep.requestSchema || {},
+        response_schema: ep.responseSchema || {},
+        sample_request: ep.sampleRequest || {},
+        sample_response: ep.sampleResponse || {},
+        query_parameters: ep.queryParameters || [],
+        path_parameters: ep.pathParameters || [],
+        response_status_codes: ep.responseStatusCodes || [],
+        created_at: new Date()
+      }));
+
+      this.inMemoryEndpoints.push(...saved);
+      return saved;
+    }
+
+    try {
+      // 1. Delete existing endpoints for this project
+      const { error: deleteError } = await this.supabase!
+        .from("endpoints")
+        .delete()
+        .eq("project_id", projectId);
+
+      if (deleteError) {
+        logger.error(`Error deleting existing endpoints in saveProjectEndpoints: ${deleteError.message}`);
+        throw deleteError;
+      }
+
+      if (endpoints.length === 0) {
+        return [];
+      }
+
+      // 2. Insert new endpoints
+      const recordsToInsert = endpoints.map(ep => ({
+        project_id: projectId,
+        method: ep.method,
+        route: ep.route,
+        controller: ep.controller,
+        source_file: ep.sourceFile,
+        middleware: ep.middleware || [],
+        authentication_required: ep.authenticationRequired || false,
+        validation_library: ep.validationLibrary,
+        request_schema: ep.requestSchema || {},
+        response_schema: ep.responseSchema || {},
+        sample_request: ep.sampleRequest || {},
+        sample_response: ep.sampleResponse || {},
+        query_parameters: ep.queryParameters || [],
+        path_parameters: ep.pathParameters || [],
+        response_status_codes: ep.responseStatusCodes || []
+      }));
+
+      const { data, error } = await this.supabase!
+        .from("endpoints")
+        .insert(recordsToInsert)
+        .select();
+
+      if (error) {
+        logger.error("Error inserting new endpoints in Supabase:", error);
+        throw error;
+      }
+
+      return data || [];
+    } catch (err) {
+      logger.error("DB Error in saveProjectEndpoints:", err);
+      throw err;
+    }
+  }
+
+  async getProjectEndpoints(projectId: string): Promise<any[]> {
+    if (this.isFallback) {
+      return this.inMemoryEndpoints
+        .filter(e => e.project_id === projectId)
+        .map(e => ({ ...e }));
+    }
+
+    try {
+      const { data, error } = await this.supabase!
+        .from("endpoints")
+        .select("*")
+        .eq("project_id", projectId)
+        .order("route", { ascending: true });
+
+      if (error) {
+        logger.error("Error fetching project endpoints from Supabase:", error);
+        throw error;
+      }
+
+      return data || [];
+    } catch (err) {
+      logger.error("DB Error in getProjectEndpoints:", err);
+      throw err;
+    }
+  }
+
+  async getEndpointById(endpointId: string): Promise<any | null> {
+    if (this.isFallback) {
+      const ep = this.inMemoryEndpoints.find(e => e.id === endpointId);
+      return ep ? { ...ep } : null;
+    }
+
+    try {
+      const { data, error } = await this.supabase!
+        .from("endpoints")
+        .select("*")
+        .eq("id", endpointId)
+        .limit(1)
+        .maybeSingle();
+
+      if (error) {
+        logger.error("Error fetching endpoint by ID from Supabase:", error);
+        throw error;
+      }
+
+      return data;
+    } catch (err) {
+      logger.error("DB Error in getEndpointById:", err);
       throw err;
     }
   }

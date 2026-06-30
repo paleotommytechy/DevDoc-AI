@@ -249,3 +249,37 @@ export const documentationApi = {
     window.URL.revokeObjectURL(downloadUrl);
   },
 };
+
+// --- Endpoints Interface & API ---
+
+export interface Endpoint {
+  id: string;
+  project_id: string;
+  method: string;
+  route: string;
+  controller: string | null;
+  source_file: string | null;
+  middleware: string[] | null;
+  authentication_required: boolean;
+  validation_library: string | null;
+  request_schema: any | null;
+  response_schema: any | null;
+  sample_request: any | null;
+  sample_response: any | null;
+  query_parameters?: string[] | null;
+  path_parameters?: string[] | null;
+  response_status_codes?: number[] | null;
+  created_at: string;
+}
+
+export const endpointsApi = {
+  getProjectEndpoints: async (projectId: string): Promise<ApiResponse<{ endpoints: Endpoint[] }>> => {
+    const res = await api.get(`/projects/${projectId}/endpoints`);
+    return res.data;
+  },
+
+  getEndpointDetails: async (endpointId: string): Promise<ApiResponse<{ endpoint: Endpoint }>> => {
+    const res = await api.get(`/endpoints/${endpointId}`);
+    return res.data;
+  },
+};

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { projectsApi, documentationApi } from "../services/api";
+import { projectsApi, documentationApi, endpointsApi } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { 
   ArrowLeft, 
@@ -70,7 +70,18 @@ export default function ProjectAnalysis() {
     enabled: !!id,
   });
 
-  if (isLoading) {
+  // Fetch detailed endpoints from the server
+  const { data: detailedEndpoints, isLoading: isLoadingEndpoints } = useQuery({
+    queryKey: ["projectEndpoints", id],
+    queryFn: async () => {
+      if (!id) throw new Error("No project ID");
+      const res = await endpointsApi.getProjectEndpoints(id);
+      return res.success ? res.data?.endpoints || [] : [];
+    },
+    enabled: !!id,
+  });
+
+  if (isLoading || isLoadingEndpoints) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col justify-center items-center gap-4">
         <Loader2 className="h-8 w-8 text-indigo-600 animate-spin" />
@@ -98,10 +109,16 @@ export default function ProjectAnalysis() {
     );
   }
 
-  // Get routes list from project
-  // In postgres, routes_discovered might be a string (json) or parsed array.
+  // Get routes list from detailed endpoints or project
   let routesList: any[] = [];
-  if (project.routes_discovered) {
+  if (detailedEndpoints && detailedEndpoints.length > 0) {
+    routesList = detailedEndpoints.map((ep: any) => ({
+      id: ep.id,
+      method: ep.method,
+      endpoint: ep.route,
+      sourceFile: ep.source_file,
+    }));
+  } else if (project.routes_discovered) {
     try {
       routesList = typeof project.routes_discovered === "string" 
         ? JSON.parse(project.routes_discovered) 
@@ -427,6 +444,7 @@ export default function ProjectAnalysis() {
                     <th className="px-6 py-3.5 w-28">Method</th>
                     <th className="px-6 py-3.5">Endpoint Path</th>
                     <th className="px-6 py-3.5">Source File Location</th>
+                    <th className="px-6 py-3.5 text-right pr-8">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -438,10 +456,32 @@ export default function ProjectAnalysis() {
                         </span>
                       </td>
                       <td className="px-6 py-3.5 font-mono text-sm font-semibold text-slate-950">
-                        {route.endpoint}
+                        {route.id ? (
+                          <Link 
+                            to={`/projects/${id}/endpoints/${route.id}`}
+                            className="text-indigo-600 hover:text-indigo-800 hover:underline transition-all"
+                          >
+                            {route.endpoint}
+                          </Link>
+                        ) : (
+                          route.endpoint
+                        )}
                       </td>
                       <td className="px-6 py-3.5 text-xs text-slate-400 font-mono">
                         {route.sourceFile}
+                      </td>
+                      <td className="px-6 py-3.5 text-right pr-8">
+                        {route.id ? (
+                          <Link
+                            to={`/projects/${id}/endpoints/${route.id}`}
+                            className="inline-flex items-center gap-1 text-xs font-bold text-indigo-600 hover:text-indigo-800 hover:underline animate-fade-in"
+                          >
+                            <span>Inspect Blueprint</span>
+                            <span>➔</span>
+                          </Link>
+                        ) : (
+                          <span className="text-xs text-slate-400 italic">Re-scan to Inspect</span>
+                        )}
                       </td>
                     </tr>
                   ))}

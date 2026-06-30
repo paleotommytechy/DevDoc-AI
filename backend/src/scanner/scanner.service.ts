@@ -1,6 +1,7 @@
 import AdmZip from "adm-zip";
 import { dbService, ProjectEntity } from "../services/db.service";
 import { logger } from "../utils/logger";
+import { EndpointParser } from "../endpoints/endpoint.parser";
 
 export interface ScanResult {
   framework: string;
@@ -256,10 +257,28 @@ export class ScannerService {
         authentication = "Supabase Auth";
       }
 
+      // Detailed Endpoint static analysis & database save
+      let detailedEndpoints: any[] = [];
+      try {
+        detailedEndpoints = EndpointParser.parseCodebase(fileContentsToCheck);
+        await dbService.saveProjectEndpoints(projectId, detailedEndpoints);
+        logger.info(`💾 Saved ${detailedEndpoints.length} detailed endpoints to the database for project ${projectId}.`);
+      } catch (err: any) {
+        logger.error(`⚠️ Failed to parse or save detailed endpoints: ${err.message}`);
+      }
+
+      const routesSummary = detailedEndpoints.map(ep => ({
+        method: ep.method,
+        endpoint: ep.route,
+        sourceFile: ep.sourceFile
+      }));
+
+      const finalRoutesDiscovered = routesSummary.length > 0 ? routesSummary : routesDiscovered;
+
       const scanResultData = {
         framework,
         language,
-        route_count: routesDiscovered.length,
+        route_count: finalRoutesDiscovered.length,
         controller_count,
         middleware_count,
         model_count,
@@ -268,10 +287,10 @@ export class ScannerService {
         analysis_status: "Completed",
         status: "Analyzed", // updates the high-level project status to 'Analyzed' (from 'Empty')
         analysis_completed_at: new Date(),
-        routes_discovered: routesDiscovered,
+        routes_discovered: finalRoutesDiscovered,
       };
 
-      logger.info(`✅ Intelligent scan completed successfully. Discovered ${routesDiscovered.length} routes.`);
+      logger.info(`✅ Intelligent scan completed successfully. Discovered ${finalRoutesDiscovered.length} routes.`);
       
       const updatedProject = await dbService.updateProjectScanResults(projectId, userId, scanResultData);
       if (!updatedProject) {

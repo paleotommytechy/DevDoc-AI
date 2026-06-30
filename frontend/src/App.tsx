@@ -10,6 +10,7 @@ import Dashboard from "./pages/Dashboard";
 import ProjectDetails from "./pages/ProjectDetails";
 import ProjectAnalysis from "./pages/ProjectAnalysis";
 import DocumentationPreview from "./pages/DocumentationPreview";
+import EndpointDetails from "./pages/EndpointDetails";
 import { Loader2 } from "lucide-react";
 
 // Initialize TanStack React Query Client
@@ -120,6 +121,14 @@ export default function App() {
                 element={
                   <ProtectedRoute>
                     <DocumentationPreview />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/projects/:id/endpoints/:endpointId"
+                element={
+                  <ProtectedRoute>
+                    <EndpointDetails />
                   </ProtectedRoute>
                 }
               />

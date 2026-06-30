@@ -122,3 +122,30 @@ This document outlines manual and edge-case testing procedures to verify the cor
   - Files are downloaded as `README.md` and `API.md` respectively.
   - Opening the files verifies they contain fully valid Markdown content matching the live preview.
 
+---
+
+## 📝 Sprint 5 Documentation Testing Scenarios
+
+### 11. Detailed Endpoint Discovery and Parameter Extraction
+- **Objective**: Verify that the scanner extracts path parameters, query parameters, validations, and custom middlewares.
+- **Setup**: Zip a codebase with an Express route like:
+  ```typescript
+  router.get('/api/projects/:projectId/milestones/:id', authMiddleware, validationMiddleware, (req, res) => {});
+  ```
+- **Execution**: Upload the zip archive and navigate to the project's **Discovery Analysis** registry table.
+- **Expected Results**:
+  - The endpoint route is discovered: `/api/projects/:projectId/milestones/:id`.
+  - Clicking on the path or **Inspect Blueprint** button redirects to the dedicated **Endpoint Details** inspector page.
+  - **Path Parameters** list contains: `projectId`, `id`.
+  - **Middleware Pipeline** lists: `authMiddleware`, `validationMiddleware`.
+
+### 12. Local Mock Sample Request & Response Generation
+- **Objective**: Verify that mock payloads are deterministically constructed matching detected variable names.
+- **Setup**: Zip an Express route with post/put handler having a body validator schema (e.g., Joi/Zod) specifying field fields like `email`, `password`, `age`, `name`.
+- **Execution**: Open the **Endpoint Details** page and navigate to **Sample Request** and **Sample Response** tabs.
+- **Expected Results**:
+  - **Sample Request** contains a beautifully formatted JSON mock with valid structure (e.g., realistic email string, secure password text, name).
+  - **Sample Response** contains standard database return mocks.
+  - Clicking **Copy JSON** adds the text to the system clipboard and triggers a green success notification alert saying *"JSON copied to clipboard!"*.
+  - **Coming Soon: Test Endpoint** button is visible but safely disabled.
+

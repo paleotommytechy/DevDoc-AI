@@ -199,4 +199,5 @@ DevDoc AI compiles scanned project AST metadata into beautifully structured mark
 ## 🗺️ Completed Milestones & Roadmap
 - **Phase 1: Code Parsing & AST Extraction** - Completed! Support parsing Express JS/TS structures to extract routes in-memory.
 - **Phase 2: Automated Markdown Documentation** - Completed! Instant, template-based generation of README.md and API.md files.
-- **Phase 3: Interactive Developer Portal** - In-progress! Native React markdown preview with download triggers.
+- **Phase 3: Interactive Developer Portal** - Completed! Native React markdown preview with download triggers.
+- **Phase 4: Endpoint Details & Sample Request/Response Generator** - Completed! Granular static analysis of API route parameters, query fields, response codes, active middlewares, and local deterministic mockup payload generation.

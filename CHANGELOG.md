@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.0] - 2026-06-30
+
+### Added
+- **Endpoint Details & Blueprint Inspector**:
+  - Implemented static AST-like analysis regex parsing to extract path/query parameters, custom middlewares, controller bindings, validations, and response status codes.
+  - Developed `EndpointGenerator` for real-time deterministic mockup JSON schema generation for both requests and responses.
+  - Added PostgreSQL migration `0005_endpoint_details.sql` for persistence of fine-grained route blueprints.
+- **REST APIs**:
+  - GET `/api/projects/:projectId/endpoints` - Fetch all owner-verified endpoint blueprints.
+  - GET `/api/endpoints/:endpointId` - Fetch complete specification details for a single endpoint.
+- **Interactive Inspector UI**:
+  - Created a dedicated `EndpointDetails` inspector page styled cleanly according to the design framework.
+  - Added tab selectors for Overview, Sample Request, and Sample Response.
+  - Implemented high-fidelity JSON payload viewers with micro-animation clipboard copying and persistent feedback.
+
 ## [1.2.0] - 2026-06-28
 
 ### Added

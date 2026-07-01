@@ -142,6 +142,10 @@ export interface Project {
   analysis_status?: string | null;
   analysis_completed_at?: string | null;
   routes_discovered?: any[] | string | null;
+  source_type?: string | null;
+  source_url?: string | null;
+  scan_status?: string | null;
+  last_scan_at?: string | null;
 }
 
 export interface ApiResponse<T> {
@@ -213,6 +217,11 @@ export const projectsApi = {
         "Content-Type": "multipart/form-data",
       },
     });
+    return res.data;
+  },
+
+  analyzeUrl: async (id: string, url: string): Promise<ApiResponse<{ project: any }>> => {
+    const res = await api.post(`/projects/${id}/analyze-url`, { url });
     return res.data;
   },
 };

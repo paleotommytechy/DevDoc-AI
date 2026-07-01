@@ -170,6 +170,21 @@ class DbService {
       `);
       await client.query(`CREATE INDEX IF NOT EXISTS idx_endpoints_project_id ON endpoints(project_id);`);
 
+      // Ensure project_sources table exists
+      logger.info("📡 Ensuring 'project_sources' table exists in database...");
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS project_sources (
+          id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+          project_id UUID REFERENCES projects(id) ON DELETE CASCADE UNIQUE NOT NULL,
+          source_type VARCHAR(50) NOT NULL,
+          source_url TEXT,
+          scan_status VARCHAR(50) DEFAULT 'PENDING' NOT NULL,
+          last_scan_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
+        );
+      `);
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_project_sources_project_id ON project_sources(project_id);`);
+
       logger.info("✅ Database schema alignment completed successfully.");
     } catch (err) {
       logger.error("❌ Failed to perform automatic schema alignment:", err);
@@ -639,6 +654,37 @@ class DbService {
     } catch (err) {
       logger.error("DB Error in getEndpointById:", err);
       throw err;
+    }
+  }
+
+  async getProjectSource(projectId: string): Promise<any | null> {
+    if (this.isFallback) {
+      const project = this.inMemoryProjects.find(p => p.id === projectId);
+      if (project && (project as any).source_type) {
+        return {
+          source_type: (project as any).source_type,
+          source_url: (project as any).source_url,
+          scan_status: (project as any).scan_status,
+          last_scan_at: (project as any).last_scan_at,
+        };
+      }
+      return null;
+    }
+
+    try {
+      const { data, error } = await this.supabase!
+        .from("project_sources")
+        .select("*")
+        .eq("project_id", projectId)
+        .limit(1)
+        .maybeSingle();
+
+      if (error) {
+        return null;
+      }
+      return data;
+    } catch (e) {
+      return null;
     }
   }
 }

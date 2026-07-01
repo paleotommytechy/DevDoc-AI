@@ -1,0 +1,152 @@
+export class OpenAPIDetector {
+  static isOpenAPI(data: any): boolean {
+    return data && (typeof data.openapi === "string" && data.openapi.startsWith("3.")) && typeof data.paths === "object";
+  }
+
+  static parse(spec: any): any[] {
+    const endpoints: any[] = [];
+    const paths = spec.paths || {};
+
+    // Helper to resolve schema definitions
+    const resolveSchema = (schema: any, depth = 0): any => {
+      if (depth > 5) return { type: "object" }; // prevent infinite loops
+      if (!schema) return null;
+      if (schema.$ref) {
+        const resolved = this.resolveRef(spec, schema.$ref);
+        return resolved ? resolveSchema(resolved, depth + 1) : null;
+      }
+      return schema;
+    };
+
+    for (const [pathKey, pathItem] of Object.entries(paths)) {
+      if (!pathItem || typeof pathItem !== "object") continue;
+
+      // Convert path params format: /users/{id} -> /users/:id
+      const expressRoute = pathKey.replace(/\{([^}]+)\}/g, ":$1");
+
+      for (const [methodKey, operation] of Object.entries(pathItem)) {
+        const method = methodKey.toUpperCase();
+        if (!["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"].includes(method)) {
+          continue;
+        }
+
+        const op = operation as any;
+        const controller = op.operationId || op.summary || null;
+        
+        // Security checks for Auth
+        const hasSecurity = (op.security && op.security.length > 0) || (spec.security && spec.security.length > 0);
+        const middleware: string[] = [];
+        if (op.security) {
+          op.security.forEach((sec: any) => {
+            middleware.push(...Object.keys(sec));
+          });
+        } else if (spec.security) {
+          spec.security.forEach((sec: any) => {
+            middleware.push(...Object.keys(sec));
+          });
+        }
+
+        const pathParameters: string[] = [];
+        const queryParameters: string[] = [];
+        let bodyFields: Record<string, string> = {};
+
+        const pathItemAny = pathItem as any;
+        // Merge parameters from path level and operation level
+        const params = [...(pathItemAny.parameters || []), ...(op.parameters || [])];
+        params.forEach((param: any) => {
+          if (!param || typeof param !== "object") return;
+          if (param.in === "path") {
+            pathParameters.push(param.name);
+          } else if (param.in === "query") {
+            queryParameters.push(param.name);
+          }
+        });
+
+        // Request Body Fields (OpenAPI 3 style)
+        if (op.requestBody && op.requestBody.content) {
+          const jsonContent = op.requestBody.content["application/json"];
+          if (jsonContent && jsonContent.schema) {
+            const resolvedSchema = resolveSchema(jsonContent.schema);
+            if (resolvedSchema && resolvedSchema.properties) {
+              for (const [propName, propVal] of Object.entries(resolvedSchema.properties)) {
+                const val = propVal as any;
+                bodyFields[propName] = val.type || "string";
+              }
+            }
+          }
+        }
+
+        // Responses and Status Codes
+        const responseStatusCodes: number[] = [];
+        let responseSchemaObj: any = {};
+        const responses = op.responses || {};
+        for (const [statusStr, resp] of Object.entries(responses)) {
+          const statusCode = parseInt(statusStr, 10);
+          if (!isNaN(statusCode)) {
+            responseStatusCodes.push(statusCode);
+            const r = resp as any;
+            if ((statusCode === 200 || statusCode === 201) && r && r.content && r.content["application/json"] && r.content["application/json"].schema) {
+              const resolvedSchema = resolveSchema(r.content["application/json"].schema);
+              if (resolvedSchema && resolvedSchema.properties) {
+                responseSchemaObj = {
+                  type: "object",
+                  properties: Object.keys(resolvedSchema.properties).reduce((acc: any, key) => {
+                    const val = (resolvedSchema.properties as any)[key];
+                    acc[key] = { type: val.type || "string" };
+                    return acc;
+                  }, {})
+                };
+              }
+            }
+          }
+        }
+
+        const requestSchemaObj = {
+          type: "object",
+          properties: Object.keys(bodyFields).reduce((acc: any, key) => {
+            acc[key] = { type: bodyFields[key] };
+            return acc;
+          }, {})
+        };
+
+        // If status codes are empty, put default
+        if (responseStatusCodes.length === 0) {
+          responseStatusCodes.push(method === "POST" ? 201 : 200);
+        }
+
+        endpoints.push({
+          method,
+          route: expressRoute,
+          controller,
+          sourceFile: "OpenAPI Spec (JSON)",
+          middleware,
+          authenticationRequired: hasSecurity,
+          validationLibrary: "OpenAPI Schemas",
+          requestSchema: requestSchemaObj,
+          responseSchema: responseSchemaObj,
+          sampleRequest: bodyFields,
+          sampleResponse: {},
+          queryParameters,
+          pathParameters,
+          responseStatusCodes,
+        });
+      }
+    }
+
+    return endpoints;
+  }
+
+  private static resolveRef(spec: any, ref: string): any {
+    if (!ref || typeof ref !== "string" || !ref.startsWith("#/")) return null;
+    const parts = ref.split("/").slice(1);
+    let current = spec;
+    for (const part of parts) {
+      if (current && typeof current === "object" && part in current) {
+        current = current[part];
+      } else {
+        return null;
+      }
+    }
+    return current;
+  }
+}

@@ -18,7 +18,25 @@ export class ProjectService {
    * Retrieves all projects for a given user
    */
   static async getMyProjects(userId: string): Promise<ProjectEntity[]> {
-    return dbService.getProjectsByUserId(userId);
+    const projects = await dbService.getProjectsByUserId(userId);
+    await Promise.all(
+      projects.map(async (project) => {
+        try {
+          const source = await dbService.getProjectSource(project.id);
+          if (source) {
+            (project as any).source_type = source.source_type;
+            (project as any).source_url = source.source_url;
+            (project as any).scan_status = source.scan_status;
+            (project as any).last_scan_at = source.last_scan_at;
+          } else {
+            if (project.status === "Analyzed") {
+              (project as any).source_type = "ZIP";
+            }
+          }
+        } catch (e) {}
+      })
+    );
+    return projects;
   }
 
   /**
@@ -31,6 +49,21 @@ export class ProjectService {
       error.status = 404;
       throw error;
     }
+
+    try {
+      const source = await dbService.getProjectSource(project.id);
+      if (source) {
+        (project as any).source_type = source.source_type;
+        (project as any).source_url = source.source_url;
+        (project as any).scan_status = source.scan_status;
+        (project as any).last_scan_at = source.last_scan_at;
+      } else {
+        if (project.status === "Analyzed") {
+          (project as any).source_type = "ZIP";
+        }
+      }
+    } catch (e) {}
+
     return project;
   }
 

@@ -15,7 +15,8 @@ import {
   Loader2, 
   X, 
   Check, 
-  Lock 
+  Lock,
+  Globe
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -33,6 +34,29 @@ export default function ProjectDetails() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [sourceType, setSourceType] = useState<"zip" | "url">("zip");
+  const [backendUrl, setBackendUrl] = useState("");
+
+  // URL analysis mutation
+  const urlAnalysisMutation = useMutation({
+    mutationFn: async (url: string) => {
+      if (!id) return;
+      const res = await projectsApi.analyzeUrl(id, url);
+      if (!res.success) {
+        throw new Error(res.message || "URL analysis failed.");
+      }
+      return res.data?.project;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["project", id] });
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      setBackendUrl("");
+      navigate(`/projects/${id}/analysis`);
+    },
+    onError: (err: any) => {
+      setErrorMsg(err.message || "Failed to analyze running backend URL.");
+    }
+  });
 
   // File upload mutation
   const uploadMutation = useMutation({
@@ -183,22 +207,27 @@ export default function ProjectDetails() {
     );
   }
 
-  if (uploadMutation.isPending) {
+  if (uploadMutation.isPending || urlAnalysisMutation.isPending) {
+    const isUrlMode = urlAnalysisMutation.isPending;
     return (
       <div className="min-h-screen bg-slate-900 text-white flex flex-col justify-center items-center p-6 text-center">
         <div className="relative flex items-center justify-center mb-8">
           <span className="absolute inline-flex h-20 w-20 rounded-full bg-indigo-500 opacity-20 animate-ping"></span>
           <div className="h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex shadow-lg shadow-indigo-500/30">
-            <Terminal className="h-8 w-8 text-white animate-pulse" />
+            {isUrlMode ? <Globe className="h-8 w-8 text-white animate-pulse" /> : <Terminal className="h-8 w-8 text-white animate-pulse" />}
           </div>
         </div>
-        <h3 className="text-2xl font-bold tracking-tight">Analyzing Project...</h3>
+        <h3 className="text-2xl font-bold tracking-tight">
+          {isUrlMode ? "Analyzing Running Backend..." : "Analyzing Project..."}
+        </h3>
         <p className="mt-2 text-sm text-slate-400 max-w-sm leading-relaxed">
-          DevDoc AI is parsing your codebase, discovering API routes, counting controllers, models, and identifying technologies.
+          {isUrlMode 
+            ? "DevDoc AI is querying your live server, probing API specifications, and mapping discovered endpoints."
+            : "DevDoc AI is parsing your codebase, discovering API routes, counting controllers, models, and identifying technologies."}
         </p>
         <div className="mt-8 flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-800 border border-slate-750 text-xs text-indigo-400 font-mono">
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          <span>AST TOKENIZATION IN PROGRESS...</span>
+          <span>{isUrlMode ? "URL CRAWLER & SCHEMA DISCOVERY IN PROGRESS..." : "AST TOKENIZATION IN PROGRESS..."}</span>
         </div>
       </div>
     );
@@ -296,12 +325,32 @@ export default function ProjectDetails() {
                   >
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                       <div>
-                        <span className="inline-flex items-center rounded-md bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700 ring-1 ring-inset ring-indigo-700/10 mb-3 font-mono">
-                          STATUS: {project.status}
-                        </span>
+                        <div className="flex flex-wrap items-center gap-2 mb-3">
+                          {project.source_type && (
+                            <span className={`inline-flex items-center rounded-md px-2.5 py-1 text-xs font-bold ring-1 ring-inset font-mono ${
+                              project.source_type === "ZIP"
+                                ? "bg-slate-50 text-slate-600 ring-slate-500/10"
+                                : project.source_type === "LOCAL_URL" || project.source_type === "LOCAL"
+                                ? "bg-emerald-50 text-emerald-700 ring-emerald-600/10"
+                                : "bg-purple-50 text-purple-700 ring-purple-600/10"
+                            }`}>
+                              SOURCE: {project.source_type === "ZIP" ? "ZIP" : (project.source_type === "LOCAL_URL" || project.source_type === "LOCAL") ? "LOCAL" : "PUBLIC"}
+                            </span>
+                          )}
+                          <span className="inline-flex items-center rounded-md bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700 ring-1 ring-inset ring-indigo-700/10 font-mono">
+                            STATUS: {project.status}
+                          </span>
+                        </div>
                         <h2 className="text-2xl font-bold text-slate-950 tracking-tight sm:text-3xl">
                           {project.name}
                         </h2>
+                        {project.source_url && (
+                          <p className="text-xs text-slate-500 font-mono mt-1.5 flex items-center gap-1">
+                            <Globe className="h-3 w-3 text-slate-400" />
+                            <span>URL:</span>
+                            <a href={project.source_url} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">{project.source_url}</a>
+                          </p>
+                        )}
                       </div>
                       
                       <div className="flex gap-2 shrink-0">
@@ -435,14 +484,14 @@ export default function ProjectDetails() {
 
           </div>
 
-          {/* RIGHT SIDE: Upload section (Unlocked & Fully Functional) */}
+          {/* RIGHT SIDE: Analyze project container */}
           <div className="lg:col-span-1">
             <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs relative overflow-hidden">
               
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
                   <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
-                    <Upload className="h-5.5 w-5.5" />
+                    {sourceType === "url" ? <Globe className="h-5.5 w-5.5" /> : <Upload className="h-5.5 w-5.5" />}
                   </div>
                   {project.analysis_status === "Completed" ? (
                     <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-700 ring-1 ring-inset ring-green-600/10 font-mono">
@@ -458,67 +507,130 @@ export default function ProjectDetails() {
 
                 <div>
                   <h3 className="text-lg font-bold text-slate-900">
-                    Upload Codebase
+                    Analyze Project
                   </h3>
-                  <p className="mt-2 text-sm text-slate-500 leading-relaxed">
-                    Upload your backend .zip archive here to trigger automatic intelligent parsing and API discovery.
+                  <p className="mt-2 text-sm text-slate-500 leading-relaxed font-sans">
+                    Choose to upload an offline codebase ZIP archive or connect a running server instance by URL for direct API discovery.
                   </p>
                 </div>
 
-                {/* File Drop/Click Zone */}
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleFileChange}
-                  accept=".zip"
-                  className="hidden"
-                />
-
-                <div
-                  onDragOver={handleDragOver}
-                  onDragLeave={handleDragLeave}
-                  onDrop={handleDrop}
-                  onClick={() => fileInputRef.current?.click()}
-                  className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer flex flex-col items-center justify-center gap-3 transition-all ${
-                    dragOver
-                      ? "border-indigo-500 bg-indigo-50/50 animate-pulse"
-                      : "border-slate-200 bg-slate-50/50 hover:bg-slate-50"
-                  }`}
-                >
-                  <Upload className={`h-8 w-8 transition-colors ${dragOver ? "text-indigo-600" : "text-slate-400"}`} />
-                  
-                  {selectedFile ? (
-                    <div className="space-y-1">
-                      <div className="text-sm font-semibold text-slate-800 truncate max-w-[200px]">
-                        {selectedFile.name}
-                      </div>
-                      <div className="text-xs text-slate-400 font-mono">
-                        {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="text-sm text-slate-600 font-semibold">
-                        Drag zip here, or click to browse
-                      </div>
-                      <span className="text-[11px] text-slate-400 font-mono">Supports .zip archives up to 50MB</span>
-                    </>
-                  )}
+                {/* Source Selection Toggle Tabs */}
+                <div className="flex gap-2 p-1 bg-slate-100 rounded-xl">
+                  <button 
+                    type="button"
+                    onClick={() => setSourceType("zip")}
+                    className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all cursor-pointer ${sourceType === "zip" ? "bg-white text-indigo-600 shadow-xs" : "text-slate-600 hover:text-slate-900"}`}
+                  >
+                    Upload ZIP
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => setSourceType("url")}
+                    className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all cursor-pointer ${sourceType === "url" ? "bg-white text-indigo-600 shadow-xs" : "text-slate-600 hover:text-slate-900"}`}
+                  >
+                    Analyze URL
+                  </button>
                 </div>
 
-                {selectedFile && (
-                  <div className="flex gap-2">
-                    <button
-                      onClick={handleUploadSubmit}
-                      className="flex-1 flex justify-center items-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-md hover:bg-indigo-500 transition-all cursor-pointer"
+                {sourceType === "zip" ? (
+                  <div className="space-y-4">
+                    {/* File Drop/Click Zone */}
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleFileChange}
+                      accept=".zip"
+                      className="hidden"
+                    />
+
+                    <div
+                      onDragOver={handleDragOver}
+                      onDragLeave={handleDragLeave}
+                      onDrop={handleDrop}
+                      onClick={() => fileInputRef.current?.click()}
+                      className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer flex flex-col items-center justify-center gap-3 transition-all ${
+                        dragOver
+                          ? "border-indigo-500 bg-indigo-50/50 animate-pulse"
+                          : "border-slate-200 bg-slate-50/50 hover:bg-slate-50"
+                      }`}
                     >
-                      <span>Parse Codebase</span>
-                    </button>
+                      <Upload className={`h-8 w-8 transition-colors ${dragOver ? "text-indigo-600" : "text-slate-400"}`} />
+                      
+                      {selectedFile ? (
+                        <div className="space-y-1">
+                          <div className="text-sm font-semibold text-slate-800 truncate max-w-[200px]">
+                            {selectedFile.name}
+                          </div>
+                          <div className="text-xs text-slate-400 font-mono">
+                            {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="text-sm text-slate-600 font-semibold">
+                            Drag zip here, or click to browse
+                          </div>
+                          <span className="text-[11px] text-slate-400 font-mono">Supports .zip archives up to 50MB</span>
+                        </>
+                      )}
+                    </div>
+
+                    {selectedFile && (
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleUploadSubmit}
+                          className="flex-1 flex justify-center items-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-md hover:bg-indigo-500 transition-all cursor-pointer"
+                        >
+                          <span>Parse Codebase</span>
+                        </button>
+                        <button
+                          onClick={() => setSelectedFile(null)}
+                          className="p-3 border border-slate-200 hover:bg-slate-50 rounded-xl text-slate-500 hover:text-slate-800 transition-all cursor-pointer flex items-center justify-center"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div>
+                      <label htmlFor="backend-url" className="block text-sm font-semibold text-slate-700">
+                        Backend URL
+                      </label>
+                      <input
+                        id="backend-url"
+                        type="url"
+                        value={backendUrl}
+                        onChange={(e) => setBackendUrl(e.target.value)}
+                        placeholder="http://localhost:3000"
+                        className="mt-2 block w-full px-4 py-3 border border-slate-200 rounded-xl text-sm transition-all bg-slate-50/50 hover:bg-slate-50 focus:bg-white focus:ring-2 focus:ring-offset-0 focus:outline-hidden focus:ring-indigo-500 font-mono"
+                      />
+                      <p className="mt-1.5 text-xs text-slate-400 font-sans">
+                        Provide a Local URL (e.g., http://localhost:3000) or Public URL (e.g., https://api.example.com).
+                      </p>
+                    </div>
+
                     <button
-                      onClick={() => setSelectedFile(null)}
-                      className="p-3 border border-slate-200 hover:bg-slate-50 rounded-xl text-slate-500 hover:text-slate-800 transition-all cursor-pointer flex items-center justify-center"
+                      onClick={() => {
+                        if (!backendUrl.trim()) {
+                          setErrorMsg("Please enter a backend URL to analyze.");
+                          return;
+                        }
+                        setErrorMsg(null);
+                        urlAnalysisMutation.mutate(backendUrl.trim());
+                      }}
+                      disabled={urlAnalysisMutation.isPending}
+                      className="w-full flex justify-center items-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-md hover:bg-indigo-500 transition-all disabled:bg-indigo-400 disabled:cursor-not-allowed cursor-pointer"
                     >
-                      <X className="h-4 w-4" />
+                      {urlAnalysisMutation.isPending ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <span>Analyzing...</span>
+                        </>
+                      ) : (
+                        <span>Analyze Button</span>
+                      )}
                     </button>
                   </div>
                 )}
@@ -526,7 +638,7 @@ export default function ProjectDetails() {
                 {/* View Latest Discovery card if project is analyzed */}
                 {project.analysis_status === "Completed" && (
                   <div className="rounded-xl bg-indigo-50/50 border border-indigo-100 p-4 space-y-3">
-                    <div className="text-xs text-indigo-950 font-medium leading-relaxed">
+                    <div className="text-xs text-indigo-950 font-medium leading-relaxed font-sans">
                       This project has been analyzed successfully. You can view the full interactive dashboard including endpoints, controllers, models, and technologies.
                     </div>
                     <Link

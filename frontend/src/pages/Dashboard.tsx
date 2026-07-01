@@ -192,9 +192,22 @@ export default function Dashboard() {
                         <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
                           <Folder className="h-5.5 w-5.5" />
                         </div>
-                        <span className="inline-flex items-center rounded-md bg-slate-50 px-2 py-1 text-xs font-medium text-slate-600 ring-1 ring-inset ring-slate-500/10 font-mono">
-                          {proj.status}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          {proj.source_type && (
+                            <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold ring-1 ring-inset font-mono ${
+                              proj.source_type === "ZIP"
+                                ? "bg-slate-50 text-slate-600 ring-slate-500/10"
+                                : proj.source_type === "LOCAL_URL" || proj.source_type === "LOCAL"
+                                ? "bg-emerald-50 text-emerald-700 ring-emerald-600/10"
+                                : "bg-purple-50 text-purple-700 ring-purple-600/10"
+                            }`}>
+                              {proj.source_type === "ZIP" ? "ZIP" : (proj.source_type === "LOCAL_URL" || proj.source_type === "LOCAL") ? "LOCAL" : "PUBLIC"}
+                            </span>
+                          )}
+                          <span className="inline-flex items-center rounded-md bg-slate-50 px-2 py-1 text-xs font-medium text-slate-600 ring-1 ring-inset ring-slate-500/10 font-mono">
+                            {proj.status}
+                          </span>
+                        </div>
                       </div>
                       
                       <h3 className="text-lg font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">

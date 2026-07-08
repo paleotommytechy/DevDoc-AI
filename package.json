@@ -33,6 +33,7 @@
     "helmet": "^8.0.0",
     "jsonwebtoken": "^9.0.3",
     "lucide-react": "^0.546.0",
+    "mermaid": "^11.16.0",
     "morgan": "^1.10.0",
     "motion": "^12.23.24",
     "multer": "^2.2.0",

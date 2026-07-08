@@ -201,3 +201,5 @@ DevDoc AI compiles scanned project AST metadata into beautifully structured mark
 - **Phase 2: Automated Markdown Documentation** - Completed! Instant, template-based generation of README.md and API.md files.
 - **Phase 3: Interactive Developer Portal** - Completed! Native React markdown preview with download triggers.
 - **Phase 4: Endpoint Details & Sample Request/Response Generator** - Completed! Granular static analysis of API route parameters, query fields, response codes, active middlewares, and local deterministic mockup payload generation.
+- **Phase 7: Architecture Visualizer** - Completed! Interactive on-the-fly rendering of Mermaid blueprints representing Project Structure, Route-to-Controller Flow, Middleware pipelines, Request Lifecycles, and Project Dependency Graphs with multi-format export engines (.mmd, .md).
+

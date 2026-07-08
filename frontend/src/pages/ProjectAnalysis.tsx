@@ -23,6 +23,7 @@ import {
   Download
 } from "lucide-react";
 import { motion } from "motion/react";
+import ArchitectureVisualizer from "../components/ArchitectureVisualizer";
 
 export default function ProjectAnalysis() {
   const { id } = useParams<{ id: string }>();
@@ -31,6 +32,7 @@ export default function ProjectAnalysis() {
   const [methodFilter, setMethodFilter] = useState("ALL");
   const [downloadingReadme, setDownloadingReadme] = useState(false);
   const [downloadingApi, setDownloadingApi] = useState(false);
+  const [activeTab, setActiveTab] = useState<"registry" | "architecture">("registry");
 
   const handleDownloadReadme = async () => {
     if (!id) return;
@@ -384,125 +386,153 @@ export default function ProjectAnalysis() {
 
         </div>
 
-        {/* Interactive Endpoints Table Section */}
-        <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
-          
-          <div className="p-6 border-b border-slate-100 space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div>
-                <h3 className="text-lg font-bold text-slate-950 flex items-center gap-2">
-                  <Globe className="h-5 w-5 text-indigo-500" />
-                  <span>API Blueprint Registry</span>
-                </h3>
-                <p className="text-xs text-slate-500">
-                  Search, filter, and inspect discovered HTTP endpoints, route methods, and controller file sources.
-                </p>
-              </div>
-              <span className="text-xs font-semibold px-2.5 py-1 rounded-md bg-slate-100 text-slate-600 font-mono">
-                FOUND: {filteredRoutes.length} of {routesList.length}
-              </span>
-            </div>
+        {/* Tab switcher */}
+        <div className="flex border-b border-slate-200">
+          <button
+            onClick={() => setActiveTab("registry")}
+            className={`pb-3.5 text-sm font-bold border-b-2 px-1 transition-all duration-150 cursor-pointer ${
+              activeTab === "registry"
+                ? "border-indigo-600 text-indigo-600"
+                : "border-transparent text-slate-500 hover:text-slate-800"
+            }`}
+          >
+            Discovery Registry
+          </button>
+          <button
+            onClick={() => setActiveTab("architecture")}
+            className={`ml-8 pb-3.5 text-sm font-bold border-b-2 px-1 transition-all duration-150 cursor-pointer ${
+              activeTab === "architecture"
+                ? "border-indigo-600 text-indigo-600"
+                : "border-transparent text-slate-500 hover:text-slate-800"
+            }`}
+          >
+            Architecture Visualizer
+          </button>
+        </div>
 
-            {/* Filter controls */}
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="relative flex-1">
-                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Search endpoint path or source file..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 text-sm border border-slate-200 rounded-xl bg-slate-50/50 hover:bg-slate-50 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 transition-all"
-                />
-              </div>
-
-              {/* Method filter selector */}
-              <div className="flex gap-1.5 overflow-x-auto pb-1 sm:pb-0">
-                {availableMethods.map((m) => (
-                  <button
-                    key={m}
-                    onClick={() => setMethodFilter(m)}
-                    className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
-                      methodFilter === m
-                        ? "bg-slate-900 text-white border-slate-900 shadow-sm"
-                        : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
-                    }`}
-                  >
-                    {m}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Table container */}
-          <div className="overflow-x-auto">
-            {filteredRoutes.length > 0 ? (
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-slate-50/70 border-b border-slate-150 text-[11px] font-bold text-slate-500 uppercase tracking-wider font-mono">
-                    <th className="px-6 py-3.5 w-28">Method</th>
-                    <th className="px-6 py-3.5">Endpoint Path</th>
-                    <th className="px-6 py-3.5">Source File Location</th>
-                    <th className="px-6 py-3.5 text-right pr-8">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {filteredRoutes.map((route, idx) => (
-                    <tr key={idx} className="hover:bg-slate-50/40 transition-colors">
-                      <td className="px-6 py-3.5">
-                        <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-[10px] font-black border uppercase tracking-wider font-mono ${getMethodColor(route.method)}`}>
-                          {route.method || "GET"}
-                        </span>
-                      </td>
-                      <td className="px-6 py-3.5 font-mono text-sm font-semibold text-slate-950">
-                        {route.id ? (
-                          <Link 
-                            to={`/projects/${id}/endpoints/${route.id}`}
-                            className="text-indigo-600 hover:text-indigo-800 hover:underline transition-all"
-                          >
-                            {route.endpoint}
-                          </Link>
-                        ) : (
-                          route.endpoint
-                        )}
-                      </td>
-                      <td className="px-6 py-3.5 text-xs text-slate-400 font-mono">
-                        {route.sourceFile}
-                      </td>
-                      <td className="px-6 py-3.5 text-right pr-8">
-                        {route.id ? (
-                          <Link
-                            to={`/projects/${id}/endpoints/${route.id}`}
-                            className="inline-flex items-center gap-1 text-xs font-bold text-indigo-600 hover:text-indigo-800 hover:underline animate-fade-in"
-                          >
-                            <span>Inspect Blueprint</span>
-                            <span>➔</span>
-                          </Link>
-                        ) : (
-                          <span className="text-xs text-slate-400 italic">Re-scan to Inspect</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : (
-              <div className="p-12 text-center flex flex-col items-center justify-center gap-4">
-                <AlertCircle className="h-12 w-12 text-slate-300" />
-                <div className="space-y-1">
-                  <h4 className="text-base font-bold text-slate-800">No API routes detected</h4>
-                  <p className="text-sm text-slate-500 max-w-sm">
-                    {routesList.length === 0 
-                      ? "No API routes were detected in this project." 
-                      : "No routes matched your current filter criteria."}
+        {activeTab === "registry" ? (
+          /* Interactive Endpoints Table Section */
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
+            
+            <div className="p-6 border-b border-slate-100 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-950 flex items-center gap-2">
+                    <Globe className="h-5 w-5 text-indigo-500" />
+                    <span>API Blueprint Registry</span>
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Search, filter, and inspect discovered HTTP endpoints, route methods, and controller file sources.
                   </p>
                 </div>
+                <span className="text-xs font-semibold px-2.5 py-1 rounded-md bg-slate-100 text-slate-600 font-mono">
+                  FOUND: {filteredRoutes.length} of {routesList.length}
+                </span>
               </div>
-            )}
-          </div>
 
-        </div>
+              {/* Filter controls */}
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Search endpoint path or source file..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 text-sm border border-slate-200 rounded-xl bg-slate-50/50 hover:bg-slate-50 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 transition-all"
+                  />
+                </div>
+
+                {/* Method filter selector */}
+                <div className="flex gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+                  {availableMethods.map((m) => (
+                    <button
+                      key={m}
+                      onClick={() => setMethodFilter(m)}
+                      className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
+                        methodFilter === m
+                          ? "bg-slate-900 text-white border-slate-900 shadow-sm"
+                          : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                      }`}
+                    >
+                      {m}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Table container */}
+            <div className="overflow-x-auto">
+              {filteredRoutes.length > 0 ? (
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50/70 border-b border-slate-150 text-[11px] font-bold text-slate-500 uppercase tracking-wider font-mono">
+                      <th className="px-6 py-3.5 w-28">Method</th>
+                      <th className="px-6 py-3.5">Endpoint Path</th>
+                      <th className="px-6 py-3.5">Source File Location</th>
+                      <th className="px-6 py-3.5 text-right pr-8">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredRoutes.map((route, idx) => (
+                      <tr key={idx} className="hover:bg-slate-50/40 transition-colors">
+                        <td className="px-6 py-3.5">
+                          <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-[10px] font-black border uppercase tracking-wider font-mono ${getMethodColor(route.method)}`}>
+                            {route.method || "GET"}
+                          </span>
+                        </td>
+                        <td className="px-6 py-3.5 font-mono text-sm font-semibold text-slate-950">
+                          {route.id ? (
+                            <Link 
+                              to={`/projects/${id}/endpoints/${route.id}`}
+                              className="text-indigo-600 hover:text-indigo-800 hover:underline transition-all"
+                            >
+                              {route.endpoint}
+                            </Link>
+                          ) : (
+                            route.endpoint
+                          )}
+                        </td>
+                        <td className="px-6 py-3.5 text-xs text-slate-400 font-mono">
+                          {route.sourceFile}
+                        </td>
+                        <td className="px-6 py-3.5 text-right pr-8">
+                          {route.id ? (
+                            <Link
+                              to={`/projects/${id}/endpoints/${route.id}`}
+                              className="inline-flex items-center gap-1 text-xs font-bold text-indigo-600 hover:text-indigo-800 hover:underline animate-fade-in"
+                            >
+                              <span>Inspect Blueprint</span>
+                              <span>➔</span>
+                            </Link>
+                          ) : (
+                            <span className="text-xs text-slate-400 italic">Re-scan to Inspect</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <div className="p-12 text-center flex flex-col items-center justify-center gap-4">
+                  <AlertCircle className="h-12 w-12 text-slate-300" />
+                  <div className="space-y-1">
+                    <h4 className="text-base font-bold text-slate-800">No API routes detected</h4>
+                    <p className="text-sm text-slate-500 max-w-sm">
+                      {routesList.length === 0 
+                        ? "No API routes were detected in this project." 
+                        : "No routes matched your current filter criteria."}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+          </div>
+        ) : (
+          <ArchitectureVisualizer projectId={id!} />
+        )}
 
       </main>
 

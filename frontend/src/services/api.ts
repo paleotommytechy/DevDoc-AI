@@ -310,3 +310,26 @@ export const endpointsApi = {
     return res.data;
   },
 };
+
+// --- Architecture Diagrams Endpoints ---
+
+export interface ArchitectureDiagram {
+  id: string;
+  project_id: string;
+  diagram_type: string;
+  mermaid_code: string;
+  generated_at: string;
+}
+
+export const architectureApi = {
+  getProjectDiagrams: async (projectId: string): Promise<ApiResponse<ArchitectureDiagram[]>> => {
+    const res = await api.get(`/projects/${projectId}/architecture`);
+    return res.data;
+  },
+
+  regenerateDiagrams: async (projectId: string): Promise<ApiResponse<ArchitectureDiagram[]>> => {
+    const res = await api.post(`/projects/${projectId}/architecture/regenerate`);
+    return res.data;
+  },
+};
+

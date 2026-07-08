@@ -6,6 +6,7 @@ import scannerRoutes from "../scanner/scanner.routes";
 import documentationRoutes from "../documentation/documentation.routes";
 import endpointRoutes from "../endpoints/endpoint.routes";
 import urlAnalysisRoutes from "../url-analysis/urlAnalysis.routes";
+import architectureRoutes from "../architecture/architecture.routes";
 
 const router = Router();
 
@@ -17,5 +18,6 @@ router.use("/", scannerRoutes);
 router.use("/", documentationRoutes);
 router.use("/", endpointRoutes);
 router.use("/", urlAnalysisRoutes);
+router.use("/", architectureRoutes);
 
 export default router;

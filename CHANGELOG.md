@@ -2,7 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.0] - 2026-07-08
+
+### Added
+- **Interactive Architecture Visualizer**:
+  - Engineered the rule-based deterministically compiled `MermaidGenerator` that outputs 7 precise layout structures: Folder Trees, Route Flow, Controller Flow, Database Entity Relations, Middleware pipelines, Request Lifecycles, and dependency graphs.
+  - Implemented lazy compilation triggers on database retrieval: if diagrams are absent for a parsed project, they are immediately compiled and persistent.
+  - Developed full-stack REST API routes:
+    - `GET /api/projects/:id/architecture` - Fetch or lazily compile the diagram list.
+    - `POST /api/projects/:id/architecture/regenerate` - Explicitly rebuild diagrams from current AST records.
+- **Dynamic Frontend Dashboard Visualizer**:
+  - Built a gorgeous multi-diagram navigation drawer inside the project workspace page.
+  - Integrated the official `mermaid` layout parser to render scalable diagrams in React with advanced error boundary shields.
+  - Developed high-performance action buttons:
+    - **Copy Code**: Seamless `navigator.clipboard` copier with visual feedback loops.
+    - **Download .mmd**: Real-time download of raw Mermaid flowchart documents.
+    - **Download Markdown**: Rich markdown document export containing embedded Mermaid graphs.
+
 ## [1.3.0] - 2026-06-30
+
 
 ### Added
 - **Endpoint Details & Blueprint Inspector**:

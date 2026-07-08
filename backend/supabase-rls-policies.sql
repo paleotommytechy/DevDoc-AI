@@ -136,3 +136,12 @@ CREATE POLICY "Allow owners to delete project sources" ON project_sources
       SELECT id FROM projects WHERE user_id = auth.uid()
     )
   );
+
+-- ==========================================
+-- 6. "architecture_diagrams" Policies (Linked via projects)
+-- ==========================================
+
+-- Disable RLS (database is proxied securely via Express backend which enforces ownership)
+ALTER TABLE architecture_diagrams DISABLE ROW LEVEL SECURITY;
+
+

@@ -149,3 +149,42 @@ This document outlines manual and edge-case testing procedures to verify the cor
   - Clicking **Copy JSON** adds the text to the system clipboard and triggers a green success notification alert saying *"JSON copied to clipboard!"*.
   - **Coming Soon: Test Endpoint** button is visible but safely disabled.
 
+---
+
+## 📝 Sprint 7 Documentation Testing Scenarios
+
+### 13. Dynamic Architectural Map Compilation
+- **Objective**: Verify that 7 specific diagrams are deterministically compiled and saved when retrieving architecture blueprints.
+- **Setup**: Zip and upload an Express codebase containing router definitions, controllers, models, and custom middlewares.
+- **Execution**: Open the project details, click **Discovery Analysis** dashboard, and switch to the **Architecture Visualizer** tab.
+- **Expected Results**:
+  - Automatically displays a loading spinner: *"Generating blueprints... First-time rendering compiles and indexes routes, controllers, and database layers dynamically."*
+  - On complete, displays a beautiful tab-navigation list containing:
+    - **Project Structure**: Renders a complete folder tree diagram representing scanned directories.
+    - **Route Flow**: Maps `/api/*` endpoints to target router code controllers.
+    - **Controller ➔ Service**: Maps controllers to logical underlying business services.
+    - **Service ➔ Database**: Maps data interactions to database client targets (e.g. Supabase, PostgreSQL).
+    - **Middleware Flow**: Visualizes authentication, rate limiting, and custom route filters.
+    - **Request Lifecycle**: Maps typical sequential execution from Client Request ➔ Middleware ➔ Router ➔ Controller ➔ DB ➔ Client Response.
+    - **Dependency Graph**: Visualizes high-level framework-to-library dependencies.
+  - Selecting any menu item renders the corresponding diagram.
+
+### 14. Diagram Actions and File Export
+- **Objective**: Verify that Mermaid diagrams can be copied, downloaded as raw `.mmd` assets, and exported as formatted Markdown `.md` documents.
+- **Setup**: Open any diagram inside the **Architecture Visualizer** tab.
+- **Execution**: 
+  - Click **Copy Code**. Verify that the console or clipboard contains the correct Mermaid string syntax (e.g., beginning with `graph TD` or similar syntax) and that the button text temporarily updates to *"Copied!"*.
+  - Click **Download .mmd**. Verify a file named `<id>_<type>.mmd` is downloaded containing raw Mermaid diagram markup.
+  - Click **Download Markdown**. Verify a file named `<id>_<type>.md` is downloaded containing a beautifully structured Markdown document, including the diagram in a standard code-block wrapper.
+
+### 15. Manual Reconstruction / Force Re-Analysis
+- **Objective**: Verify that diagram nodes update instantly when trigger actions are dispatched.
+- **Setup**: View any diagram tab for an analyzed project.
+- **Execution**: Click **Re-Analyze Architecture** or **Force Generate Blueprint Map**.
+- **Expected Results**:
+  - Dispatches a POST request to `/api/projects/:id/architecture/regenerate`.
+  - Displays a clean loading state inside the viewer.
+  - Reloads and replaces cached diagram configurations in the database.
+  - Rerenders the updated maps immediately on the interface.
+
+

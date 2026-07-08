@@ -42,6 +42,7 @@ class DbService {
   private inMemoryUsers: UserEntity[] = [];
   private inMemoryProjects: ProjectEntity[] = [];
   private inMemoryEndpoints: any[] = [];
+  private inMemoryDiagrams: any[] = [];
 
   public getIsFallback(): boolean {
     return this.isFallback;
@@ -105,6 +106,7 @@ class DbService {
     const client = new pg.Client({
       connectionString: dbUrl,
       ssl: useSsl ? { rejectUnauthorized: false } : false,
+      connectionTimeoutMillis: 5000, // Fail fast (5s) if direct Postgres port 5432 is blocked by container firewall
     });
 
     try {
@@ -192,6 +194,28 @@ class DbService {
         );
       `);
       await client.query(`CREATE INDEX IF NOT EXISTS idx_project_sources_project_id ON project_sources(project_id);`);
+
+      // Ensure architecture_diagrams table exists
+      logger.info("📡 Ensuring 'architecture_diagrams' table exists in database...");
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS architecture_diagrams (
+          id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+          project_id UUID REFERENCES projects(id) ON DELETE CASCADE NOT NULL,
+          diagram_type VARCHAR(50) NOT NULL,
+          mermaid_code TEXT NOT NULL,
+          generated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+          UNIQUE(project_id, diagram_type)
+        );
+      `);
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_architecture_diagrams_project_id ON architecture_diagrams(project_id);`);
+
+      // Disable RLS on architecture_diagrams to let the unauthenticated Express backend save diagrams securely.
+      // The Express backend itself handles strict ownership validation on every HTTP request before DB saves.
+      await client.query(`ALTER TABLE architecture_diagrams DISABLE ROW LEVEL SECURITY;`);
+      await client.query(`DROP POLICY IF EXISTS "Allow owners to insert architecture diagrams" ON architecture_diagrams;`);
+      await client.query(`DROP POLICY IF EXISTS "Allow owners to view architecture diagrams" ON architecture_diagrams;`);
+      await client.query(`DROP POLICY IF EXISTS "Allow owners to update architecture diagrams" ON architecture_diagrams;`);
+      await client.query(`DROP POLICY IF EXISTS "Allow owners to delete architecture diagrams" ON architecture_diagrams;`);
 
       logger.info("✅ Database schema alignment completed successfully.");
     } catch (err) {
@@ -693,6 +717,82 @@ class DbService {
       return data;
     } catch (e) {
       return null;
+    }
+  }
+
+  // --- Architecture Diagrams CRUD ---
+
+  async getProjectDiagrams(projectId: string): Promise<any[]> {
+    if (this.isFallback) {
+      return this.inMemoryDiagrams
+        .filter((d) => d.project_id === projectId)
+        .map((d) => ({ ...d }));
+    }
+
+    try {
+      const { data, error } = await this.supabase!
+        .from("architecture_diagrams")
+        .select("*")
+        .eq("project_id", projectId);
+
+      if (error) {
+        logger.error("Error fetching project diagrams from Supabase:", error);
+        throw error;
+      }
+      return data || [];
+    } catch (err) {
+      logger.error("DB Error in getProjectDiagrams:", err);
+      throw err;
+    }
+  }
+
+  async saveProjectDiagram(projectId: string, diagramType: string, mermaidCode: string): Promise<any> {
+    const trimmedCode = mermaidCode.trim();
+    if (this.isFallback) {
+      const existingIdx = this.inMemoryDiagrams.findIndex(
+        (d) => d.project_id === projectId && d.diagram_type === diagramType
+      );
+      const now = new Date();
+      if (existingIdx !== -1) {
+        this.inMemoryDiagrams[existingIdx].mermaid_code = trimmedCode;
+        this.inMemoryDiagrams[existingIdx].generated_at = now;
+        return { ...this.inMemoryDiagrams[existingIdx] };
+      } else {
+        const record = {
+          id: crypto.randomUUID(),
+          project_id: projectId,
+          diagram_type: diagramType,
+          mermaid_code: trimmedCode,
+          generated_at: now,
+        };
+        this.inMemoryDiagrams.push(record);
+        return { ...record };
+      }
+    }
+
+    try {
+      const { data, error } = await this.supabase!
+        .from("architecture_diagrams")
+        .upsert(
+          {
+            project_id: projectId,
+            diagram_type: diagramType,
+            mermaid_code: trimmedCode,
+            generated_at: new Date().toISOString(),
+          },
+          { onConflict: "project_id,diagram_type" }
+        )
+        .select()
+        .single();
+
+      if (error) {
+        logger.error("Error saveProjectDiagram in Supabase:", error);
+        throw error;
+      }
+      return data;
+    } catch (err) {
+      logger.error("DB Error in saveProjectDiagram:", err);
+      throw err;
     }
   }
 }

@@ -19,8 +19,8 @@ const COOKIE_NAME = "token";
 const setAuthCookie = (res: Response, token: string) => {
   res.cookie(COOKIE_NAME, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    secure: true, // Always true to support sameSite: "none" in the HTTPS iframe environment
+    sameSite: "none", // Must be "none" to allow cross-site cookie transmission inside the iframe
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     path: "/",
   });
@@ -99,8 +99,8 @@ export class AuthController {
   static logout(req: Request, res: Response): void {
     res.clearCookie(COOKIE_NAME, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
+      secure: true,
+      sameSite: "none",
       path: "/",
     });
 

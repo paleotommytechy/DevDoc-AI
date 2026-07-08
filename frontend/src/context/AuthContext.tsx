@@ -41,6 +41,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const res = await authApi.login(email, password);
       if (res.success && res.data?.user) {
+        if (res.data.token) {
+          localStorage.setItem("token", res.data.token);
+        }
         setUser(res.data.user);
       } else {
         throw new Error(res.message || "Login failed");
@@ -58,6 +61,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const res = await authApi.register(email, password);
       if (res.success && res.data?.user) {
+        if (res.data.token) {
+          localStorage.setItem("token", res.data.token);
+        }
         setUser(res.data.user);
       } else {
         throw new Error(res.message || "Registration failed");
@@ -77,6 +83,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch {
       // Proceed with local logout regardless of API success
     } finally {
+      localStorage.removeItem("token");
       setUser(null);
       setIsLoading(false);
     }

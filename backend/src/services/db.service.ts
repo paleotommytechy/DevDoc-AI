@@ -43,6 +43,14 @@ class DbService {
   private inMemoryProjects: ProjectEntity[] = [];
   private inMemoryEndpoints: any[] = [];
 
+  public getIsFallback(): boolean {
+    return this.isFallback;
+  }
+
+  public getSupabaseClient(): SupabaseClient | null {
+    return this.supabase;
+  }
+
   constructor() {
     const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || config.SUPABASE_URL || config.VITE_SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || config.SUPABASE_ANON_KEY || config.VITE_SUPABASE_PUBLISHABLE_KEY;

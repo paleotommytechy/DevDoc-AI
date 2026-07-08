@@ -1,70 +1,138 @@
--- SQL Permission & RLS Configuration for DevDoc AI Supabase Integration
--- Open your Supabase Dashboard -> SQL Editor, paste this script, and run it.
+-- Row Level Security (RLS) Policies for DevDoc AI Tables
+-- Run this script in your Supabase SQL Editor to enforce secure data isolation.
 
--- ====================================================================
--- OPTION A: DISABLE ROW-LEVEL SECURITY (Recommended for Custom Backends)
--- ====================================================================
--- Since DevDoc AI uses a secure Express backend with its own JWT token
--- and bcrypt authentication, the backend already handles all access control.
--- Disabling RLS allows your backend client to perform CRUD operations smoothly.
-
-ALTER TABLE users DISABLE ROW LEVEL SECURITY;
-ALTER TABLE projects DISABLE ROW LEVEL SECURITY;
-
--- If you ran Option A, you are ALL SET! You can ignore Option B below.
-
-
--- ====================================================================
--- OPTION B: ENABLE RLS WITH REQUISITE POLICIES (If you prefer keeping RLS enabled)
--- ====================================================================
--- If your organization requires Row Level Security to be strictly enabled
--- on all tables, uncomment and run the following statements instead.
-
-/*
--- 1. Enable RLS on both tables
+-- ==========================================
+-- 1. Enable Row Level Security (RLS) on all tables
+-- ==========================================
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
+ALTER TABLE endpoints ENABLE ROW LEVEL SECURITY;
+ALTER TABLE project_sources ENABLE ROW LEVEL SECURITY;
 
--- 2. Drop existing policies to avoid name collisions
-DROP POLICY IF EXISTS "Allow public select/insert to users" ON users;
-DROP POLICY IF EXISTS "Allow public insert to users" ON users;
-DROP POLICY IF EXISTS "Allow public select to users" ON users;
-DROP POLICY IF EXISTS "Allow public update to users" ON users;
+-- ==========================================
+-- 2. "users" (Profiles) Policies
+-- ==========================================
 
-DROP POLICY IF EXISTS "Allow public select to projects" ON projects;
-DROP POLICY IF EXISTS "Allow public insert to projects" ON projects;
-DROP POLICY IF EXISTS "Allow public update to projects" ON projects;
-DROP POLICY IF EXISTS "Allow public delete to projects" ON projects;
-
--- 3. Create permissive policies for the Users table
--- Allows the backend API (running under the 'anon' or 'authenticated' role) to manage user records.
-CREATE POLICY "Allow public insert to users" ON users 
+-- Allow insertion of public user records during frontend sign-up
+CREATE POLICY "Allow public insert to users profile" ON users
   FOR INSERT 
   WITH CHECK (true);
 
-CREATE POLICY "Allow public select to users" ON users 
+-- Allow users to view their own profile only
+CREATE POLICY "Allow users to read their own profile" ON users
   FOR SELECT 
-  USING (true);
+  USING (auth.uid() = id);
 
-CREATE POLICY "Allow public update to users" ON users 
+-- Allow users to update their own profile details
+CREATE POLICY "Allow users to update their own profile" ON users
   FOR UPDATE 
-  USING (true);
+  USING (auth.uid() = id);
 
--- 4. Create permissive policies for the Projects table
--- Allows the backend API to query, create, update, and delete project logs.
-CREATE POLICY "Allow public select to projects" ON projects 
-  FOR SELECT 
-  USING (true);
-
-CREATE POLICY "Allow public insert to projects" ON projects 
-  FOR INSERT 
-  WITH CHECK (true);
-
-CREATE POLICY "Allow public update to projects" ON projects 
-  FOR UPDATE 
-  USING (true);
-
-CREATE POLICY "Allow public delete to projects" ON projects 
+-- Allow users to delete their own profile
+CREATE POLICY "Allow users to delete their own profile" ON users
   FOR DELETE 
-  USING (true);
-*/
+  USING (auth.uid() = id);
+
+-- ==========================================
+-- 3. "projects" Policies
+-- ==========================================
+
+-- Allow users to insert projects bound to their authenticated ID
+CREATE POLICY "Allow users to insert their own projects" ON projects
+  FOR INSERT 
+  WITH CHECK (auth.uid() = user_id);
+
+-- Allow users to view only their own projects
+CREATE POLICY "Allow users to view their own projects" ON projects
+  FOR SELECT 
+  USING (auth.uid() = user_id);
+
+-- Allow users to update only their own projects
+CREATE POLICY "Allow users to update their own projects" ON projects
+  FOR UPDATE 
+  USING (auth.uid() = user_id);
+
+-- Allow users to delete only their own projects
+CREATE POLICY "Allow users to delete their own projects" ON projects
+  FOR DELETE 
+  USING (auth.uid() = user_id);
+
+-- ==========================================
+-- 4. "endpoints" Policies (Linked via projects)
+-- ==========================================
+
+-- Allow endpoint insertion only if the linked project belongs to the authenticated user
+CREATE POLICY "Allow owners to insert endpoints" ON endpoints
+  FOR INSERT
+  WITH CHECK (
+    project_id IN (
+      SELECT id FROM projects WHERE user_id = auth.uid()
+    )
+  );
+
+-- Allow endpoint viewing only if the linked project belongs to the authenticated user
+CREATE POLICY "Allow owners to view endpoints" ON endpoints
+  FOR SELECT
+  USING (
+    project_id IN (
+      SELECT id FROM projects WHERE user_id = auth.uid()
+    )
+  );
+
+-- Allow endpoint updates only if the linked project belongs to the authenticated user
+CREATE POLICY "Allow owners to update endpoints" ON endpoints
+  FOR UPDATE
+  USING (
+    project_id IN (
+      SELECT id FROM projects WHERE user_id = auth.uid()
+    )
+  );
+
+-- Allow endpoint deletion only if the linked project belongs to the authenticated user
+CREATE POLICY "Allow owners to delete endpoints" ON endpoints
+  FOR DELETE
+  USING (
+    project_id IN (
+      SELECT id FROM projects WHERE user_id = auth.uid()
+    )
+  );
+
+-- ==========================================
+-- 5. "project_sources" Policies (Linked via projects)
+-- ==========================================
+
+-- Allow source insertion only if the linked project belongs to the authenticated user
+CREATE POLICY "Allow owners to insert project sources" ON project_sources
+  FOR INSERT
+  WITH CHECK (
+    project_id IN (
+      SELECT id FROM projects WHERE user_id = auth.uid()
+    )
+  );
+
+-- Allow source viewing only if the linked project belongs to the authenticated user
+CREATE POLICY "Allow owners to view project sources" ON project_sources
+  FOR SELECT
+  USING (
+    project_id IN (
+      SELECT id FROM projects WHERE user_id = auth.uid()
+    )
+  );
+
+-- Allow source updates only if the linked project belongs to the authenticated user
+CREATE POLICY "Allow owners to update project sources" ON project_sources
+  FOR UPDATE
+  USING (
+    project_id IN (
+      SELECT id FROM projects WHERE user_id = auth.uid()
+    )
+  );
+
+-- Allow source deletion only if the linked project belongs to the authenticated user
+CREATE POLICY "Allow owners to delete project sources" ON project_sources
+  FOR DELETE
+  USING (
+    project_id IN (
+      SELECT id FROM projects WHERE user_id = auth.uid()
+    )
+  );

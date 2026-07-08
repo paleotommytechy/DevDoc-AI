@@ -12,6 +12,20 @@ export const api = axios.create({
   },
 });
 
+// Request interceptor to attach JWT/Supabase token from localStorage
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
 // Intercept Axios errors globally
 api.interceptors.response.use(
   (response) => response,
@@ -41,8 +55,9 @@ api.interceptors.response.use(
       const requestMethod = error.config?.method?.toUpperCase() || "";
 
       const isMeRequest = status === 401 && (requestUrl === "/auth/me" || requestUrl.includes("/me"));
+      const isLoginRequest = status === 401 && (requestUrl.includes("/login") || requestUrl.includes("/register"));
 
-      if (!isMeRequest) {
+      if (!isMeRequest && !isLoginRequest) {
         console.group(`%c🖥️ [FRONTEND LOG: BACKEND API ERROR (${status})]`, "color: #dc2626; font-weight: bold; font-size: 13px;");
         console.error(`Origin: Backend API Server (${requestMethod} ${requestUrl})`);
         console.error(`HTTP Status Code: ${status}`);
@@ -53,8 +68,11 @@ api.interceptors.response.use(
 
       // Decide whether to show toast based on HTTP status
       if (status === 401) {
-        // Only show if it's not the initial check auth (me)
-        if (!isMeRequest) {
+        // Only show if it's not the initial check auth (me) and not a login/register request
+        const isLoginOrRegisterPage = typeof window !== "undefined" && 
+          (window.location.pathname.includes("/login") || window.location.pathname.includes("/register"));
+
+        if (!isMeRequest && !isLoginRequest && !isLoginOrRegisterPage) {
           showGlobalToast("Your session has expired. Please log in again.", "warning");
         }
       } else if (status === 403) {

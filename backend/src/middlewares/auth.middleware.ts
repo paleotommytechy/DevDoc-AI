@@ -9,7 +9,7 @@ export interface AuthRequest extends Request {
   };
 }
 
-export const authMiddleware = (req: AuthRequest, res: Response, next: NextFunction) => {
+export const authMiddleware = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     let token = "";
 
@@ -30,7 +30,7 @@ export const authMiddleware = (req: AuthRequest, res: Response, next: NextFuncti
       return;
     }
 
-    const decoded = AuthService.verifyToken(token);
+    const decoded = await AuthService.verifyToken(token);
     req.user = decoded;
     next();
   } catch (err: any) {

@@ -7,6 +7,7 @@ const router = Router();
 // Apply auth middleware to all project endpoints
 router.use(authMiddleware as any);
 
+router.post("/projects/demo", ProjectController.createDemo as any);
 router.post("/projects", ProjectController.create as any);
 router.get("/projects", ProjectController.getMyProjects as any);
 router.get("/projects/:id", ProjectController.getOne as any);

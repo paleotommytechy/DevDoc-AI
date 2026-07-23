@@ -218,8 +218,17 @@ class DbService {
       await client.query(`DROP POLICY IF EXISTS "Allow owners to delete architecture diagrams" ON architecture_diagrams;`);
 
       logger.info("✅ Database schema alignment completed successfully.");
-    } catch (err) {
-      logger.error("❌ Failed to perform automatic schema alignment:", err);
+    } catch (err: any) {
+      const isConnRefused = err?.code === "ECONNREFUSED" || 
+                            err?.message?.includes("ECONNREFUSED") || 
+                            err?.name === "AggregateError" ||
+                            (Array.isArray(err?.errors) && err.errors.some((e: any) => e.code === "ECONNREFUSED"));
+
+      if (isConnRefused) {
+        logger.warn("ℹ️ Direct PostgreSQL database (DATABASE_URL) is offline or unreachable. Skipping DDL schema alignment.");
+      } else {
+        logger.error(`❌ Failed to perform automatic schema alignment: ${err.message || err}`);
+      }
     } finally {
       try {
         await client.end();

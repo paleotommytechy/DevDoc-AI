@@ -81,4 +81,56 @@ export class DocumentationController {
       });
     }
   }
+
+  /**
+   * Download OpenAPI 3.1 JSON Specification
+   */
+  static async downloadOpenApi(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { id: projectId } = req.params;
+      const userId = req.user!.userId;
+
+      const project = await ProjectService.getProject(projectId, userId);
+      const { dbService } = await import("../services/db.service");
+      const endpoints = await dbService.getProjectEndpoints(projectId);
+      const { OpenApiGenerator } = await import("../generators/openapi.generator");
+      const spec = OpenApiGenerator.generateSpec(project, endpoints);
+
+      res.setHeader("Content-Type", "application/json");
+      res.setHeader("Content-Disposition", `attachment; filename="${project.name || "openapi"}-spec.json"`);
+      res.status(200).json(spec);
+    } catch (err: any) {
+      logger.error(`❌ Failed to export OpenAPI spec: ${err.message}`);
+      res.status(err.status || 500).json({
+        success: false,
+        message: err.message || "An error occurred while exporting OpenAPI spec.",
+      });
+    }
+  }
+
+  /**
+   * Download Postman Collection v2.1
+   */
+  static async downloadPostman(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { id: projectId } = req.params;
+      const userId = req.user!.userId;
+
+      const project = await ProjectService.getProject(projectId, userId);
+      const { dbService } = await import("../services/db.service");
+      const endpoints = await dbService.getProjectEndpoints(projectId);
+      const { PostmanGenerator } = await import("../generators/postman.generator");
+      const collection = PostmanGenerator.generateCollection(project, endpoints);
+
+      res.setHeader("Content-Type", "application/json");
+      res.setHeader("Content-Disposition", `attachment; filename="${project.name || "postman"}-collection.json"`);
+      res.status(200).json(collection);
+    } catch (err: any) {
+      logger.error(`❌ Failed to export Postman collection: ${err.message}`);
+      res.status(err.status || 500).json({
+        success: false,
+        message: err.message || "An error occurred while exporting Postman collection.",
+      });
+    }
+  }
 }

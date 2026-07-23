@@ -286,16 +286,26 @@ export interface Endpoint {
   route: string;
   controller: string | null;
   source_file: string | null;
+  sourceFile?: string | null;
   middleware: string[] | null;
   authentication_required: boolean;
+  authenticationRequired?: boolean;
   validation_library: string | null;
+  validationLibrary?: string | null;
   request_schema: any | null;
+  requestSchema?: any | null;
   response_schema: any | null;
+  responseSchema?: any | null;
   sample_request: any | null;
+  sampleRequest?: any | null;
   sample_response: any | null;
+  sampleResponse?: any | null;
   query_parameters?: string[] | null;
+  queryParameters?: string[] | null;
   path_parameters?: string[] | null;
+  pathParameters?: string[] | null;
   response_status_codes?: number[] | null;
+  responseStatusCodes?: number[] | null;
   created_at: string;
 }
 

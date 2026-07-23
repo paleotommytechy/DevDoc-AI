@@ -121,6 +121,27 @@ export class ProjectController {
   }
 
   /**
+   * Create interactive demo project
+   */
+  static async createDemo(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const userId = req.user?.userId || "demo-user";
+      const { DemoService } = await import("../services/demo.service");
+      const project = await DemoService.createDemoProject(userId);
+
+      res.status(201).json({
+        success: true,
+        message: "Demo project created successfully",
+        data: {
+          project,
+        },
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
    * Delete a project
    */
   static async delete(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
